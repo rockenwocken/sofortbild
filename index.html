@@ -176,6 +176,7 @@ details summary { font-weight: 500; cursor: pointer; min-height: 32px; }
         <option value="bayer">Raster: Retro-Look</option>
       </select>
     </div>
+    <label class="check"><input id="s-compare" type="checkbox"><span>Vergleichsdruck<small>Jedes Foto wird dreimal untereinander gedruckt: Atkinson, Floyd-Steinberg und Raster, jeweils beschriftet.</small></span></label>
     <div class="row">
       <label for="s-bright">Bildhelligkeit <span class="val" id="v-bright"></span></label>
       <input id="s-bright" type="range" min="60" max="170" step="5">
@@ -206,7 +207,7 @@ details summary { font-weight: 500; cursor: pointer; min-height: 32px; }
 <script>
 "use strict";
 /* ---------- Einstellungen ---------- */
-const DEFAULTS = { format: "square", dither: "atkinson", bright: 110, dark: 80, frame: true, caption: "", rotate: false };
+const DEFAULTS = { format: "square", dither: "atkinson", bright: 110, dark: 80, frame: true, caption: "", rotate: false, compare: false };
 const S = { ...DEFAULTS };
 try { Object.assign(S, JSON.parse(localStorage.getItem("sofortbild") || "{}")); } catch (e) {}
 const save = () => { try { localStorage.setItem("sofortbild", JSON.stringify(S)); } catch (e) {} };
@@ -276,19 +277,28 @@ function paintBits(ctx, bits, w, h, x = 0, y = 0) {
   }
   ctx.putImageData(img, x, y);
 }
-function photoBits(src, sw, sh, mirror) {
+function photoBits(src, sw, sh, mirror, kind = S.dither) {
   const { w, h } = photoSize();
   const g = grayCover(src, sw, sh, w, h, mirror);
   tone(g, S.bright / 100);
-  return { bits: dither(g, w, h, S.dither), w, h };
+  return { bits: dither(g, w, h, kind), w, h };
+}
+const DITHER_NAMES = { atkinson: "Atkinson", floyd: "Floyd-Steinberg", bayer: "Raster (Bayer 8x8)" };
+/* Vergleichsdruck: dasselbe Foto mit allen drei Punktmustern untereinander */
+function comparePage(src, sw, sh, mirror) {
+  const now = new Date(), kinds = Object.keys(DITHER_NAMES);
+  const pages = kinds.map((k, i) => composePage(photoBits(src, sw, sh, mirror, k), now, DITHER_NAMES[k], i === kinds.length - 1 ? TEAR_LINES : 28));
+  const h = pages.reduce((n, p) => n + p.h, 0), bits = new Uint8Array(HEAD_WIDTH * h);
+  let at = 0; for (const p of pages) { bits.set(p.bits, at); at += p.bits.length; }
+  return { bits, w: HEAD_WIDTH, h };
 }
 /* Fertige Druckseite: 384 Punkte breit, inklusive Rahmen, Text und Abreißkante */
 const TEAR_LINES = 70;
-function composePage(p, now = new Date()) {
+function composePage(p, now = new Date(), label = "", tear = TEAR_LINES) {
   const c = document.createElement("canvas"), m = S.frame ? 16 : 0;
-  const caption = S.frame ? [S.caption.trim(), now.toLocaleDateString("de-DE") + "  " + now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })].filter(Boolean) : [];
+  const caption = [label, ...(S.frame ? [S.caption.trim(), now.toLocaleDateString("de-DE") + "  " + now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })] : [])].filter(Boolean);
   const textH = caption.length ? 16 + caption.length * 30 : m;
-  c.width = HEAD_WIDTH; c.height = m + p.h + textH + TEAR_LINES;
+  c.width = HEAD_WIDTH; c.height = m + p.h + textH + tear;
   const x = c.getContext("2d", { willReadFrequently: true });
   x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
   paintBits(x, p.bits, p.w, p.h, m, m);
@@ -547,7 +557,12 @@ function shoot() {
   const fl = $("flash"); fl.classList.remove("go"); void fl.offsetWidth; fl.classList.add("go");
   if (navigator.vibrate) navigator.vibrate(30);
   const s = source();
-  lastPage = composePage(photoBits(s.src, s.w, s.h, s.mirror));
+  if (S.compare) {
+    /* Ein Standbild festhalten, damit alle drei Drucke exakt dasselbe Motiv zeigen */
+    const still = document.createElement("canvas"); still.width = s.w; still.height = s.h;
+    still.getContext("2d").drawImage(s.src, 0, 0, s.w, s.h);
+    lastPage = comparePage(still, s.w, s.h, s.mirror);
+  } else lastPage = composePage(photoBits(s.src, s.w, s.h, s.mirror));
   stillSource = null;
   showSheet(lastPage);
   runPrint(lastPage);
@@ -583,7 +598,7 @@ $("forget").addEventListener("click", () => {
   printer.device = null; printer.ae01 = null; printer.battery = null;
   $("settings").close(); updateStatus();
 });
-const F = { format: "s-format", dither: "s-dither", bright: "s-bright", dark: "s-dark", frame: "s-frame", caption: "s-caption", rotate: "s-rotate" };
+const F = { format: "s-format", dither: "s-dither", bright: "s-bright", dark: "s-dark", frame: "s-frame", caption: "s-caption", rotate: "s-rotate", compare: "s-compare" };
 function fillSettings() {
   for (const [k, id] of Object.entries(F)) { const el = $(id); if (el.type === "checkbox") el.checked = S[k]; else el.value = S[k]; }
   labels();
