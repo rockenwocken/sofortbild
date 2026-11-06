@@ -455,12 +455,16 @@ class Printer {
     await finished;
   }
   async printClassic({ data, rowBytes, lines }, darkness, onprogress) {
+    /* Ablauf wie im Projekt NaitLee/Cat-Printer (MX05, MX06, GB01 …):
+       Status, Druckstart, 200 dpi, Tempo, Energie, Energie übernehmen, Gerät aktualisieren, dann die Zeilen */
     const energy = Math.round(darkness * 0xffff), parts = [
-      old(0xa3, [0]), old(0xa4, [0x32]), old(0xaf, [energy & 255, energy >> 8]), old(0xbe, [1]), old(0xbd, [25]),
+      old(0xa3, [0]), old(0xa3, [0]), old(0xa4, [50]), old(0xbd, [32]),
+      old(0xaf, [energy & 255, energy >> 8]), old(0xbe, [1]), old(0xa9, [0]),
       old(0xa6, [0xaa, 0x55, 0x17, 0x38, 0x44, 0x5f, 0x5f, 0x5f, 0x44, 0x38, 0x2c])
     ];
+    this.log(`Klassischer Druck: ${lines} Zeilen, Energie ${energy.toString(16)}`);
     for (let y = 0; y < lines; y++) parts.push(old(0xa2, [...data.subarray(y * rowBytes, (y + 1) * rowBytes)]));
-    parts.push(old(0xa6, [0xaa, 0x55, 0x17, 0, 0, 0, 0, 0, 0, 0, 0x17]), old(0xa3, [0]));
+    parts.push(old(0xa6, [0xaa, 0x55, 0x17, 0, 0, 0, 0, 0, 0, 0, 0x17]), old(0xbd, [8]), old(0xa3, [0]));
     const total = parts.reduce((n, p) => n + p.length, 0), all = new Uint8Array(total);
     let at = 0; for (const p of parts) { all.set(p, at); at += p.length; }
     await this.stream(this.ae01, all, 100, 20, onprogress);
