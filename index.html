@@ -3,172 +3,176 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#17444f">
+<meta name="theme-color" content="#ffffff">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Sofortbild</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Spline+Sans+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&display=swap">
 <style>
-/* Layout: ein Kameragehäuse aus lackiertem Blech – Sucher oben, Papierschlitz, Auslöser. */
+/* Layout: Schreibtisch im Stil des Apple Lisa Office System (1983) –
+   Menüleiste oben, Sucher als randloses Fenster über den ganzen Bildschirm, Bedienleiste als Palette unten. */
 :root {
-  --body: #17444f; --body-hi: #215a67; --body-lo: #0e2f37;
-  --paper: #f3f1e8; --ink: #1a1c1c;
-  --shutter: #f2c230; --shutter-lo: #b98d10;
-  --label: #cfe3e0; --good: #9fe0a8; --bad: #ffb4a0;
-  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
-  --mono: "Spline Sans Mono", ui-monospace, Menlo, monospace;
-  color-scheme: dark;
+  --white: #ffffff; --black: #000000; --paper: #f3f1e8; --ink: #1a1c1c;
+  --ui: "Pixelify Sans", "Chicago", "Geneva", ui-monospace, monospace;
+  color-scheme: light;
 }
 [hidden] { display: none !important; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; margin: 0; }
 body {
-  background: var(--body); color: var(--label); font: 15px/1.4 var(--display);
-  display: flex; justify-content: center; overflow: hidden; user-select: none;
+  background: var(--white); color: var(--black); font: 16px/1.3 var(--ui);
+  overflow: hidden; user-select: none; -webkit-font-smoothing: none;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr);
 }
+.menubar, .palette { min-width: 0; overflow: hidden; }
+#shutter { align-content: center; }
+.btn { align-content: center; }
 button { font: inherit; color: inherit; cursor: pointer; }
-:focus-visible { outline: 3px solid var(--shutter); outline-offset: 2px; }
-.camera {
-  width: 100%; max-width: 480px; height: 100%; display: flex; flex-direction: column; gap: 12px;
-  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-}
-.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.brand { font-weight: 800; font-size: 24px; letter-spacing: -.02em; color: var(--paper); }
-.pill {
-  display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; min-width: 0;
-  background: var(--body-lo); border: 0; border-radius: 20px; font: 400 12px var(--mono); text-align: left;
-}
-.dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--bad); }
-.pill.on .dot { background: var(--good); box-shadow: 0 0 8px var(--good); }
-.pill.busy .dot { background: var(--shutter); animation: blink .7s infinite alternate; }
-@keyframes blink { to { opacity: .25; } }
+:focus-visible { outline: 2px dashed var(--black); outline-offset: 2px; }
 
-.finder {
-  position: relative; flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;
-  background: var(--paper); border-radius: 6px 6px 0 0; overflow: hidden;
-  box-shadow: inset 0 0 0 5px var(--body-lo);
+/* 50 % Graumuster des Lisa-Schreibtischs */
+.desk { background-color: var(--white); background-image: repeating-conic-gradient(var(--black) 0 25%, var(--white) 0 50%); background-size: 2px 2px; }
+/* Gestreifte Titelleiste */
+.titlebar {
+  display: flex; align-items: center; justify-content: center; height: 22px; border-bottom: 1px solid var(--black);
+  background: repeating-linear-gradient(var(--white) 0 2px, var(--black) 2px 3px) 0 3px / 100% calc(100% - 6px) no-repeat, var(--white);
 }
-#vf { max-width: calc(100% - 10px); max-height: calc(100% - 10px); image-rendering: pixelated; display: block; }
-#flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
-#flash.go { animation: flash .35s ease-out; }
+.titlebar span { background: var(--white); padding: 0 10px; font-weight: 600; font-size: 14px; }
+
+.menubar {
+  display: flex; align-items: stretch; gap: 2px; min-height: 36px; background: var(--white); border-bottom: 2px solid var(--black);
+  padding: env(safe-area-inset-top, 0px) max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px));
+}
+.menubar .name { font-weight: 700; padding: 0 10px 0 4px; display: flex; align-items: center; }
+.menu { display: flex; align-items: center; gap: 6px; padding: 0 8px; flex: none; border: 0; background: none; min-width: 0; white-space: nowrap; }
+.menu:active, .menu.open { background: var(--black); color: var(--white); }
+#status { flex: 1 1 auto; min-width: 0; justify-content: flex-start; overflow: hidden; }
+#statustext { overflow: hidden; text-overflow: ellipsis; }
+.lamp { flex: none; width: 10px; height: 10px; border: 1.5px solid currentColor; border-radius: 50%; }
+#status.on .lamp { background: currentColor; }
+#status.busy .lamp { animation: blink .6s steps(2) infinite; }
+@keyframes blink { 50% { background: currentColor; } }
+
+.finder { position: relative; min-height: 0; overflow: hidden; }
+#vf { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
+#flash { position: absolute; inset: 0; background: var(--white); opacity: 0; pointer-events: none; }
+#flash.go { animation: flash .3s steps(3); }
 @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
-.hint {
-  position: absolute; left: 12px; right: 12px; bottom: 12px; padding: 8px 12px; border-radius: 4px;
-  background: var(--ink); color: var(--paper); font: 400 12px/1.4 var(--mono);
-}
 
-.slot { flex: none; height: 12px; margin-top: -12px; background: linear-gradient(var(--body-lo) 40%, #061a1f); border-radius: 0 0 4px 4px; position: relative; z-index: 3; }
+/* Hinweisfenster */
+.alert {
+  position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); top: 12px; z-index: 3;
+  background: var(--white); border: 2px solid var(--black); box-shadow: 3px 3px 0 var(--black);
+  display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 10px 12px; font-size: 14px; line-height: 1.35;
+}
+.alert b { width: 26px; height: 26px; border: 2px solid var(--black); border-radius: 50%; display: grid; place-items: center; font-size: 16px; }
 
-.deck { position: relative; flex: none; height: 148px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
-.side { display: flex; gap: 8px; }
-.side.r { justify-content: flex-end; }
-.tool {
-  width: 52px; height: 52px; display: grid; place-items: center; background: var(--body-hi); border: 0; border-radius: 12px;
+/* Bedienpalette */
+.palette {
+  background: var(--white); border-top: 2px solid var(--black); position: relative; z-index: 3;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-.tool svg { width: 24px; height: 24px; fill: none; stroke: var(--paper); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.tool[disabled] { opacity: .35; }
-#shutter {
-  width: 112px; height: 112px; border-radius: 50%; border: 7px solid var(--body-lo);
-  background: radial-gradient(circle at 38% 30%, #ffe27a, var(--shutter) 55%, var(--shutter-lo));
-  box-shadow: 0 7px 0 var(--body-lo); transition: transform .08s, box-shadow .08s;
+.palette .row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-block: 12px;
+  padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
 }
-#shutter:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--body-lo); }
-#shutter[disabled] { filter: saturate(.3) brightness(.75); }
+.palette .group { display: flex; gap: 8px; }
+.btn {
+  min-height: 48px; min-width: 64px; padding: 6px 12px; background: var(--white); border: 2px solid var(--black); border-radius: 10px;
+  display: grid; justify-items: center; gap: 2px; font-size: 13px; line-height: 1;
+}
+.btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; }
+.btn:active, .btn[aria-pressed="true"] { background: var(--black); color: var(--white); }
+.btn[disabled] { color: #777; border-color: #777; }
+/* Standardknopf mit doppeltem Rahmen wie in Lisa-Dialogen */
+.btn.default { outline: 2px solid var(--black); outline-offset: 2px; }
+#shutter { min-width: 112px; min-height: 64px; font-size: 18px; font-weight: 700; border-radius: 14px; }
+#shutter[disabled] { background: var(--white); }
 
-/* Der Ausdruck schiebt sich aus dem Schlitz über Sucher und Bedienfeld */
-#tray { position: fixed; inset: 0 0 auto; height: var(--tray, 70dvh); z-index: 2; pointer-events: none; overflow: hidden; display: flex; justify-content: center; transition: background .3s; filter: drop-shadow(0 6px 14px #0009); }
-#tray.out { background: #0e2f37e6; }
-#sheet {
-  position: absolute; background: var(--paper);
-  transform: translateY(var(--from, 100dvh)); pointer-events: auto;
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 96% 99%, 92% 100%, 88% 99%, 84% 100%, 80% 99%, 76% 100%, 72% 99%, 68% 100%, 64% 99%, 60% 100%, 56% 99%, 52% 100%, 48% 99%, 44% 100%, 40% 99%, 36% 100%, 32% 99%, 28% 100%, 24% 99%, 20% 100%, 16% 99%, 12% 100%, 8% 99%, 4% 100%, 0 99%);
-}
+/* Ausdruck kommt aus dem Schlitz unter der Menüleiste */
+#tray { position: fixed; left: 0; right: 0; top: var(--slot, 40px); bottom: var(--palette, 90px); z-index: 2; overflow: hidden; display: flex; justify-content: center; pointer-events: none; }
+#sheet { position: absolute; background: var(--paper); transform: translateY(-101%); filter: drop-shadow(3px 3px 0 var(--black)); }
 #sheet canvas { display: block; width: 100%; image-rendering: pixelated; }
+#tray.out { pointer-events: auto; }
 #tray.out #sheet { transition: transform var(--eject, 3s) linear; transform: translateY(0); }
-#sheetbar {
-  position: fixed; left: 0; right: 0; bottom: 0; top: var(--tray, 70dvh); z-index: 4; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--body);
-  padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
-}
-#sheetbar button { min-height: 48px; padding: 8px 20px; border: 0; border-radius: 24px; background: var(--ink); color: var(--paper); font-weight: 500; box-shadow: 0 3px 12px #0008; }
-#sheetbar .main { background: var(--shutter); color: var(--ink); }
 
 dialog {
-  width: min(92vw, 420px); max-height: 88dvh; border: 0; border-radius: 10px; padding: 20px;
-  background: var(--paper); color: var(--ink); user-select: text;
+  width: min(94vw, 440px); max-height: 90dvh; padding: 0; border: 2px solid var(--black); border-radius: 0;
+  background: var(--white); color: var(--black); box-shadow: 4px 4px 0 var(--black); user-select: text; font-family: var(--ui);
 }
-dialog::backdrop { background: #0009; }
-dialog h2 { margin: 0 0 14px; font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
-form { display: grid; gap: 14px; }
-.row { display: grid; gap: 4px; }
-.row label, .check { font-weight: 500; }
-.row small, .check small { font: 400 12px/1.4 var(--mono); opacity: .7; display: block; }
-select, input[type=text] { width: 100%; min-height: 44px; padding: 8px 10px; font: 15px var(--display); color: var(--ink); background: #fff; border: 1.5px solid var(--ink); border-radius: 6px; }
-input[type=range] { width: 100%; accent-color: var(--body); height: 32px; }
+dialog::backdrop { background-color: transparent; background-image: repeating-conic-gradient(#0008 0 25%, transparent 0 50%); background-size: 2px 2px; }
+dialog form { display: grid; gap: 14px; padding: 14px 16px 16px; }
+.field { display: grid; gap: 4px; }
+.field label, .check { font-weight: 600; }
+.field small, .check small { font-weight: 400; font-size: 13px; display: block; }
+select, input[type=text] { width: 100%; min-height: 44px; padding: 6px 8px; font: 16px var(--ui); color: var(--black); background: var(--white); border: 2px solid var(--black); border-radius: 0; }
+input[type=range] { width: 100%; height: 30px; accent-color: var(--black); }
 .check { display: flex; gap: 10px; align-items: flex-start; }
-.check input { width: 22px; height: 22px; flex: none; margin: 1px 0 0; accent-color: var(--body); }
-.val { float: right; font: 400 13px var(--mono); }
-details summary { font-weight: 500; cursor: pointer; min-height: 32px; }
-#diag { margin: 8px 0; max-height: 30dvh; overflow: auto; padding: 8px; background: #fff; border: 1.5px solid var(--ink); border-radius: 6px; font: 11px/1.45 var(--mono); white-space: pre-wrap; word-break: break-all; user-select: text; }
-#copydiag { min-height: 40px; padding: 6px 14px; border: 1.5px solid var(--ink); border-radius: 6px; background: none; color: var(--ink); }
-.acts { display: flex; gap: 8px; flex-wrap: wrap; }
-.acts button { flex: 1 1 auto; min-height: 46px; border: 1.5px solid var(--ink); border-radius: 6px; background: none; color: var(--ink); padding: 8px 12px; }
-.acts .main { background: var(--body); border-color: var(--body); color: var(--paper); }
-@media (max-height: 620px) { .deck { height: 116px; } #shutter { width: 88px; height: 88px; } }
-@media (prefers-reduced-motion: reduce) { #tray.out #sheet { transition: none; } #flash.go, .pill.busy .dot { animation: none; } }
+.check input { width: 22px; height: 22px; flex: none; margin: 0; accent-color: var(--black); }
+.val { float: right; font-weight: 400; }
+hr { border: 0; border-top: 1px dotted var(--black); margin: 0; width: 100%; }
+details summary { font-weight: 600; cursor: pointer; min-height: 30px; }
+#diag { margin: 8px 0; max-height: 28dvh; overflow: auto; padding: 8px; border: 1px solid var(--black); font: 11px/1.4 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
+.acts { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; padding-top: 4px; }
+.acts .btn { min-height: 44px; font-size: 15px; display: inline-block; }
+@media (prefers-reduced-motion: reduce) { #tray.out #sheet { transition: none; } #flash.go, #status.busy .lamp { animation: none; } }
 </style>
 </head>
 <body>
-<main class="camera">
-  <header class="top">
-    <div class="brand">Sofortbild</div>
-    <button class="pill" id="status" type="button"><span class="dot"></span><span id="statustext">Drucker verbinden</span></button>
-  </header>
+<header class="menubar">
+  <span class="name">Sofortbild</span>
+  <button class="menu" id="status" type="button"><span class="lamp"></span><span id="statustext">Drucker verbinden</span></button>
+  <button class="menu" id="gear" type="button">Einstellungen</button>
+</header>
 
-  <div class="finder">
-    <canvas id="vf" width="352" height="352" aria-label="Sucher mit Druckvorschau"></canvas>
-    <div id="flash"></div>
-    <div class="hint" id="hint" hidden></div>
-  </div>
-  <div class="slot"></div>
-
-  <div class="deck">
-    <div class="side">
-      <button class="tool" id="flip" type="button" aria-label="Kamera wechseln" title="Kamera wechseln">
-        <svg viewBox="0 0 24 24"><path d="M4 10a8 8 0 0 1 14-4l2 2M20 4v4h-4M20 14a8 8 0 0 1-14 4l-2-2M4 20v-4h4"/></svg>
-      </button>
-    </div>
-    <button id="shutter" type="button" aria-label="Foto machen und drucken"></button>
-    <div class="side r">
-      <button class="tool" id="pick" type="button" aria-label="Foto aus der Galerie drucken" title="Foto aus der Galerie">
-        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-4 3 2.5 4-4 4 4"/></svg>
-      </button>
-      <button class="tool" id="gear" type="button" aria-label="Einstellungen" title="Einstellungen">
-        <svg viewBox="0 0 24 24"><path d="M4 7h9M18 7h2M4 17h2M11 17h9"/><circle cx="15.5" cy="7" r="2.5"/><circle cx="8.5" cy="17" r="2.5"/></svg>
-      </button>
-    </div>
-  </div>
-</main>
-
-<div id="tray"><div id="sheet"><canvas id="print"></canvas></div></div>
-<div id="sheetbar" hidden>
-  <button id="again" type="button">Nochmal drucken</button>
-  <button id="done" class="main" type="button">Nächstes Foto</button>
+<div class="finder desk" id="finder">
+  <canvas id="vf" width="384" height="700" aria-label="Sucher mit Druckvorschau"></canvas>
+  <div id="flash"></div>
+  <div class="alert" id="hintbox" hidden><b>!</b><span id="hint"></span></div>
 </div>
 
+<footer class="palette" id="palette">
+  <div class="titlebar"><span id="paltitle">Kamera</span></div>
+  <div class="row" id="controls">
+    <div class="group">
+      <button class="btn" id="flip" type="button"><svg viewBox="0 0 24 24"><path d="M4 10a8 8 0 0 1 14-4l2 2M20 4v4h-4M20 14a8 8 0 0 1-14 4l-2-2M4 20v-4h4"/></svg>Wenden</button>
+      <button class="btn" id="torch" type="button" aria-pressed="false" disabled><svg viewBox="0 0 24 24"><path d="M8 3h8v4l-2 3v11h-4V10L8 7z M12 13v3"/></svg>Licht</button>
+    </div>
+    <button class="btn default" id="shutter" type="button">Auslösen</button>
+    <div class="group">
+      <button class="btn" id="pick" type="button"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><path d="m4 17 5-4 3 2.5 4-4 4 4"/></svg>Galerie</button>
+    </div>
+  </div>
+  <div class="row" id="sheetbar" hidden>
+    <button class="btn" id="again" type="button">Nochmal drucken</button>
+    <button class="btn default" id="done" type="button">Nächstes Foto</button>
+  </div>
+</footer>
+
+<div id="tray"><div id="sheet"><canvas id="print"></canvas></div></div>
 <input id="file" type="file" accept="image/*" hidden>
 
 <dialog id="settings">
-  <h2>Einstellungen</h2>
+  <div class="titlebar"><span>Einstellungen</span></div>
   <form method="dialog">
-    <div class="row">
+    <div class="field">
+      <label for="s-caption">Text unter dem Bild</label>
+      <input id="s-caption" type="text" maxlength="28" placeholder="zum Beispiel Omas 80. Geburtstag" autocomplete="off">
+      <small>Wird groß unter jedes Foto gedruckt. Leer lassen für keinen Text.</small>
+    </div>
+    <label class="check"><input id="s-date" type="checkbox"><span>Datum und Uhrzeit drucken</span></label>
+    <label class="check"><input id="s-frame" type="checkbox"><span>Weißer Rand um das Foto</span></label>
+    <hr>
+    <div class="field">
       <label for="s-format">Bildformat</label>
       <select id="s-format">
+        <option value="screen">Ganzer Bildschirm (lang)</option>
         <option value="square">Quadrat wie ein Polaroid</option>
         <option value="tall">Hochformat 3:4</option>
         <option value="wide">Querformat 4:3</option>
       </select>
     </div>
-    <div class="row">
+    <div class="field">
       <label for="s-dither">Punktmuster</label>
       <select id="s-dither">
         <option value="atkinson">Atkinson: kräftig, kontrastreich</option>
@@ -176,30 +180,31 @@ details summary { font-weight: 500; cursor: pointer; min-height: 32px; }
         <option value="bayer">Raster: Retro-Look</option>
       </select>
     </div>
-    <label class="check"><input id="s-compare" type="checkbox"><span>Vergleichsdruck<small>Jedes Foto wird dreimal untereinander gedruckt: Atkinson, Floyd-Steinberg und Raster, jeweils beschriftet.</small></span></label>
-    <div class="row">
+    <label class="check"><input id="s-compare" type="checkbox"><span>Vergleichsdruck<small>Jedes Foto dreimal untereinander: Atkinson, Floyd-Steinberg und Raster.</small></span></label>
+    <div class="field">
       <label for="s-bright">Bildhelligkeit <span class="val" id="v-bright"></span></label>
       <input id="s-bright" type="range" min="60" max="170" step="5">
     </div>
-    <div class="row">
+    <div class="field">
       <label for="s-dark">Druckstärke <span class="val" id="v-dark"></span></label>
       <input id="s-dark" type="range" min="20" max="100" step="5">
       <small>Höher wird schwärzer, leert aber den Akku schneller.</small>
     </div>
-    <label class="check"><input id="s-frame" type="checkbox"><span>Weißer Rahmen mit Datum</span></label>
-    <div class="row">
-      <label for="s-caption">Eigener Text unter dem Foto</label>
-      <input id="s-caption" type="text" maxlength="28" placeholder="zum Beispiel Omas 80. Geburtstag" autocomplete="off">
+    <div class="field">
+      <label for="s-feed">Papiervorschub am Ende <span class="val" id="v-feed"></span></label>
+      <input id="s-feed" type="range" min="0" max="30" step="1">
+      <small>Leeres Papier nach dem Text, damit beim Abreißen nichts abgeschnitten wird.</small>
     </div>
     <label class="check"><input id="s-rotate" type="checkbox"><span>Druck um 180° drehen<small>Einschalten, falls das Foto auf dem Kopf aus dem Drucker kommt.</small></span></label>
+    <hr>
     <details>
       <summary>Diagnose für die Fehlersuche</summary>
       <pre id="diag"></pre>
-      <button id="copydiag" type="button">Diagnose kopieren</button>
+      <button class="btn" id="copydiag" type="button" style="display:inline-block">Diagnose kopieren</button>
     </details>
     <div class="acts">
-      <button id="forget" type="button">Anderen Drucker wählen</button>
-      <button class="main" type="submit">Fertig</button>
+      <button class="btn" id="forget" type="button">Anderen Drucker wählen</button>
+      <button class="btn default" type="submit">OK</button>
     </div>
   </form>
 </dialog>
@@ -207,17 +212,24 @@ details summary { font-weight: 500; cursor: pointer; min-height: 32px; }
 <script>
 "use strict";
 /* ---------- Einstellungen ---------- */
-const DEFAULTS = { format: "square", dither: "atkinson", bright: 110, dark: 80, frame: true, caption: "", rotate: false, compare: false };
+const DEFAULTS = { format: "screen", dither: "atkinson", bright: 110, dark: 80, frame: true, date: true, caption: "", rotate: false, compare: false, feed: 5 };
 const S = { ...DEFAULTS };
 try { Object.assign(S, JSON.parse(localStorage.getItem("sofortbild") || "{}")); } catch (e) {}
+if (!S.v2) { S.format = "screen"; S.feed = DEFAULTS.feed; S.v2 = 1; }
 const save = () => { try { localStorage.setItem("sofortbild", JSON.stringify(S)); } catch (e) {} };
 
 /* ---------- Bildverarbeitung ---------- */
 const HEAD_WIDTH = 384;
 const FORMATS = { square: 1, tall: 4 / 3, wide: 3 / 4 };
+/* "Ganzer Bildschirm": Seitenverhältnis des Suchers, das Foto wird entsprechend lang gedruckt */
+const ratio = () => {
+  if (S.format !== "screen") return FORMATS[S.format] || 1;
+  const f = document.getElementById("finder");
+  return Math.min(3, Math.max(1, f.clientHeight / Math.max(1, f.clientWidth)));
+};
 const photoSize = () => {
   const w = S.frame ? 352 : HEAD_WIDTH;
-  return { w, h: Math.round(w * FORMATS[S.format]) };
+  return { w, h: Math.round(w * ratio()) };
 };
 const scratch = document.createElement("canvas");
 const sctx = scratch.getContext("2d", { willReadFrequently: true });
@@ -287,26 +299,33 @@ const DITHER_NAMES = { atkinson: "Atkinson", floyd: "Floyd-Steinberg", bayer: "R
 /* Vergleichsdruck: dasselbe Foto mit allen drei Punktmustern untereinander */
 function comparePage(src, sw, sh, mirror) {
   const now = new Date(), kinds = Object.keys(DITHER_NAMES);
-  const pages = kinds.map((k, i) => composePage(photoBits(src, sw, sh, mirror, k), now, DITHER_NAMES[k], i === kinds.length - 1 ? TEAR_LINES : 28));
+  const pages = kinds.map((k, i) => composePage(photoBits(src, sw, sh, mirror, k), now, DITHER_NAMES[k], i === kinds.length - 1 ? TEAR_LINES() : 28));
   const h = pages.reduce((n, p) => n + p.h, 0), bits = new Uint8Array(HEAD_WIDTH * h);
   let at = 0; for (const p of pages) { bits.set(p.bits, at); at += p.bits.length; }
   return { bits, w: HEAD_WIDTH, h };
 }
-/* Fertige Druckseite: 384 Punkte breit, inklusive Rahmen, Text und Abreißkante */
-const TEAR_LINES = 70;
-function composePage(p, now = new Date(), label = "", tear = TEAR_LINES) {
+/* Fertige Druckseite: 384 Punkte breit (8 Punkte pro mm), inklusive Rahmen, Text und Vorschub zum Abreißen.
+   Der Abreißkante liegt ein Stück hinter dem Druckkopf, daher der Grundvorschub plus einstellbarer Rest. */
+const BASE_FEED = 70;
+const TEAR_LINES = () => BASE_FEED + S.feed * 8;
+const FONT = '"Pixelify Sans", monospace';
+function composePage(p, now = new Date(), label = "", tear = TEAR_LINES()) {
   const c = document.createElement("canvas"), m = S.frame ? 16 : 0;
-  const caption = [label, ...(S.frame ? [S.caption.trim(), now.toLocaleDateString("de-DE") + "  " + now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })] : [])].filter(Boolean);
-  const textH = caption.length ? 16 + caption.length * 30 : m;
+  const stamp = S.date ? now.toLocaleDateString("de-DE") + "  " + now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "";
+  const small = [label, stamp].filter(Boolean).join("  ·  ");
+  const caption = [S.caption.trim() && { t: S.caption.trim(), size: 30, gap: 38 }, small && { t: small, size: 20, gap: 28 }].filter(Boolean);
+  const textH = caption.length ? 14 + caption.reduce((n, l) => n + l.gap, 0) : m;
   c.width = HEAD_WIDTH; c.height = m + p.h + textH + tear;
   const x = c.getContext("2d", { willReadFrequently: true });
   x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
   paintBits(x, p.bits, p.w, p.h, m, m);
   x.fillStyle = "#000"; x.textAlign = "center"; x.textBaseline = "top";
-  caption.forEach((t, i) => {
-    x.font = (i === caption.length - 1 ? "600 20px " : "600 24px ") + '"Spline Sans Mono", monospace';
-    x.fillText(t, HEAD_WIDTH / 2, m + p.h + 14 + i * 30, HEAD_WIDTH - 2 * m);
-  });
+  let ty = m + p.h + 14;
+  for (const l of caption) {
+    x.font = `${l.size > 24 ? 700 : 600} ${l.size}px ${FONT}`;
+    x.fillText(l.t, HEAD_WIDTH / 2, ty, HEAD_WIDTH - 2 * Math.max(m, 8));
+    ty += l.gap;
+  }
   const d = x.getImageData(0, 0, c.width, c.height).data, bits = new Uint8Array(c.width * c.height);
   for (let i = 0; i < bits.length; i++) bits[i] = d[i * 4 + 1] < 128 ? 1 : 0;
   return { bits, w: c.width, h: c.height };
@@ -445,7 +464,7 @@ const video = document.createElement("video");
 video.playsInline = true; video.muted = true;
 let facing = "environment", stream = null, sample = null, lastPage = null, busy = false, stillSource = null;
 
-function hint(text) { $("hint").textContent = text || ""; $("hint").hidden = !text; }
+function hint(text) { $("hint").textContent = text || ""; $("hintbox").hidden = !text; }
 function updateStatus(text) {
   const el = $("status"), label = $("statustext");
   el.classList.toggle("on", printer.connected);
@@ -467,7 +486,24 @@ function makeSample() {
   x.fillStyle = "#667"; x.fillRect(0, 335, 400, 65);
   return c;
 }
+/* Taschenlampe: Chrome auf Android kann die Lampe der Rückkamera schalten */
+let torchOn = false;
+function setupTorch() {
+  const track = stream && stream.getVideoTracks()[0];
+  const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+  torchOn = false; $("torch").setAttribute("aria-pressed", "false");
+  $("torch").disabled = !caps.torch;
+}
+async function toggleTorch() {
+  const track = stream && stream.getVideoTracks()[0];
+  if (!track) return;
+  try {
+    await track.applyConstraints({ advanced: [{ torch: !torchOn }] });
+    torchOn = !torchOn; $("torch").setAttribute("aria-pressed", String(torchOn));
+  } catch (e) { hint("Die Lampe lässt sich mit dieser Kamera nicht einschalten."); }
+}
 async function startCamera() {
+  $("torch").disabled = true;
   if (stream) stream.getTracks().forEach(t => t.stop());
   stream = null;
   try {
@@ -475,9 +511,10 @@ async function startCamera() {
     stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 1280 } } });
     video.srcObject = stream; await video.play();
     hint(""); stillSource = null;
+    setupTorch();
   } catch (e) {
     sample = sample || makeSample();
-    hint("Die Kamera ist nicht freigegeben. Erlaube sie in Chrome oder wähle rechts ein Foto aus der Galerie. Bis dahin siehst du ein Beispielbild.");
+    hint("Die Kamera ist nicht freigegeben. Erlaube sie in Chrome oder wähle unten rechts ein Foto aus der Galerie. Bis dahin siehst du ein Beispielbild.");
   }
 }
 const source = () => stillSource
@@ -498,23 +535,24 @@ function loop(t) {
 
 function showSheet(page) {
   const c = $("print"); c.width = page.w; c.height = page.h;
-  const x = c.getContext("2d"); paintBits(x, page.bits, page.w, page.h);
+  paintBits(c.getContext("2d"), page.bits, page.w, page.h);
+  $("controls").hidden = true; $("sheetbar").hidden = false; $("paltitle").textContent = "Ausdruck";
   const tray = $("tray"), sheet = $("sheet"), root = document.documentElement.style;
-  const room = document.querySelector(".slot").getBoundingClientRect().top;
-  const width = Math.min(innerWidth * .82, 340, (room - 76) * page.w / page.h);
-  const height = width * page.h / page.w, top = Math.max(64, (room - height) / 2 + 20);
+  const slot = document.querySelector(".menubar").getBoundingClientRect().bottom;
+  const pal = innerHeight - $("palette").getBoundingClientRect().top;
+  root.setProperty("--slot", slot + "px"); root.setProperty("--palette", pal + "px");
+  const room = innerHeight - slot - pal - 16;
+  const width = Math.min(innerWidth * .86, 360, room * page.w / page.h);
   tray.classList.remove("out");
-  sheet.style.width = width + "px"; sheet.style.top = top + "px";
-  root.setProperty("--tray", room + "px"); root.setProperty("--from", (room - top) + "px");
+  sheet.style.width = width + "px"; sheet.style.top = "0px";
   void sheet.offsetWidth;
-  root.setProperty("--eject", Math.max(2, page.h / 180) + "s");
-  $("sheetbar").hidden = false;
+  root.setProperty("--eject", Math.max(2, page.h / 200) + "s");
   requestAnimationFrame(() => tray.classList.add("out"));
 }
 function hideSheet() {
   $("tray").classList.remove("out");
   $("sheet").style.transition = "none";
-  $("sheetbar").hidden = true;
+  $("sheetbar").hidden = true; $("controls").hidden = false; $("paltitle").textContent = "Kamera";
   requestAnimationFrame(() => { $("sheet").style.transition = ""; });
 }
 function friendly(e) {
@@ -546,7 +584,7 @@ async function runPrint(page) {
     busy = false; updateStatus();
     const msg = friendly(e);
     printer.log("Fehler: " + (e && (e.name + " " + e.message)));
-    if (msg) { hint(msg + " Unter Einstellungen → Diagnose steht, was genau passiert ist."); $("sheetbar").hidden = true; $("tray").classList.remove("out"); }
+    if (msg) { hideSheet(); hint(msg + " Unter Einstellungen → Diagnose steht, was genau passiert ist."); }
     else updateStatus();
   } finally {
     $("shutter").disabled = false; $("again").disabled = false;
@@ -572,6 +610,7 @@ function shoot() {
 $("shutter").addEventListener("click", shoot);
 $("again").addEventListener("click", () => { if (lastPage) { showSheet(lastPage); runPrint(lastPage); } });
 $("done").addEventListener("click", hideSheet);
+$("torch").addEventListener("click", toggleTorch);
 $("flip").addEventListener("click", () => { facing = facing === "user" ? "environment" : "user"; startCamera(); });
 $("pick").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", e => {
@@ -587,7 +626,8 @@ $("status").addEventListener("click", async () => {
   catch (e) { updateStatus(); const m = friendly(e); if (m) hint(m); }
 });
 const diagText = () => [`Sofortbild ${navigator.userAgent}`, ...printer.diag].join("\n") || "Noch keine Daten. Verbinde den Drucker und drück einmal den Auslöser.";
-$("gear").addEventListener("click", () => { fillSettings(); $("diag").textContent = diagText(); $("settings").showModal(); });
+$("gear").addEventListener("click", () => { fillSettings(); $("diag").textContent = diagText(); $("gear").classList.add("open"); $("settings").showModal(); });
+$("settings").addEventListener("close", () => $("gear").classList.remove("open"));
 $("copydiag").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(diagText()); $("copydiag").textContent = "Kopiert"; }
   catch (e) { const r = document.createRange(); r.selectNodeContents($("diag")); getSelection().removeAllRanges(); getSelection().addRange(r); $("copydiag").textContent = "Markiert, jetzt kopieren"; }
@@ -598,12 +638,12 @@ $("forget").addEventListener("click", () => {
   printer.device = null; printer.ae01 = null; printer.battery = null;
   $("settings").close(); updateStatus();
 });
-const F = { format: "s-format", dither: "s-dither", bright: "s-bright", dark: "s-dark", frame: "s-frame", caption: "s-caption", rotate: "s-rotate", compare: "s-compare" };
+const F = { format: "s-format", dither: "s-dither", bright: "s-bright", dark: "s-dark", frame: "s-frame", caption: "s-caption", rotate: "s-rotate", compare: "s-compare", date: "s-date", feed: "s-feed" };
 function fillSettings() {
   for (const [k, id] of Object.entries(F)) { const el = $(id); if (el.type === "checkbox") el.checked = S[k]; else el.value = S[k]; }
   labels();
 }
-function labels() { $("v-bright").textContent = S.bright + " %"; $("v-dark").textContent = S.dark + " %"; }
+function labels() { $("v-bright").textContent = S.bright + " %"; $("v-dark").textContent = S.dark + " %"; $("v-feed").textContent = "+" + S.feed + " mm"; }
 for (const [k, id] of Object.entries(F)) $(id).addEventListener("input", e => {
   const el = e.target;
   S[k] = el.type === "checkbox" ? el.checked : el.type === "range" ? +el.value : el.value;
@@ -615,6 +655,8 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) keep
 
 window.Sofortbild = { printer, crc8, mxw, old, packPage, composePage, dither };
 updateStatus(); keepAwake(); startCamera(); requestAnimationFrame(loop);
+/* Schrift für den Drucktext vorab laden, sonst druckt Canvas mit Ersatzschrift */
+if (document.fonts) document.fonts.load(`700 30px ${FONT}`).catch(() => {});
 if (!canBluetooth()) hint(NO_BT);
 </script>
 </body>
