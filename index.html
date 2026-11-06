@@ -3,105 +3,81 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#000000">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Sofortbild</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&display=swap">
 <style>
-/* Layout: Schreibtisch im Stil des Apple Lisa Office System (1983) –
-   Menüleiste oben, Sucher als randloses Fenster über den ganzen Bildschirm, Bedienleiste als Palette unten. */
+/* Layout: randloser Sucher über den ganzen Bildschirm, nur der Auslöser bleibt sichtbar.
+   Nach oben wischen: Stufe 1 zeigt drei Werkzeuge, Stufe 2 schiebt die Einstellungen als Lisa-Fenster herein. */
 :root {
-  --white: #ffffff; --black: #000000; --paper: #f3f1e8; --ink: #1a1c1c;
+  --white: #ffffff; --black: #000000; --paper: #f3f1e8;
   --ui: "Pixelify Sans", "Chicago", "Geneva", ui-monospace, monospace;
   color-scheme: light;
 }
 [hidden] { display: none !important; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { height: 100%; margin: 0; }
-body {
-  background: var(--white); color: var(--black); font: 16px/1.3 var(--ui);
-  overflow: hidden; user-select: none; -webkit-font-smoothing: none;
-  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr);
-}
-.menubar, .palette { min-width: 0; overflow: hidden; }
-#shutter { align-content: center; }
-.btn { align-content: center; }
+html, body { height: 100%; margin: 0; overscroll-behavior: none; }
+body { background: var(--black); color: var(--black); font: 16px/1.3 var(--ui); overflow: hidden; user-select: none; touch-action: none; }
 button { font: inherit; color: inherit; cursor: pointer; }
 :focus-visible { outline: 2px dashed var(--black); outline-offset: 2px; }
-
-/* 50 % Graumuster des Lisa-Schreibtischs */
-.desk { background-color: var(--white); background-image: repeating-conic-gradient(var(--black) 0 25%, var(--white) 0 50%); background-size: 2px 2px; }
-/* Gestreifte Titelleiste */
 .titlebar {
-  display: flex; align-items: center; justify-content: center; height: 22px; border-bottom: 1px solid var(--black);
-  background: repeating-linear-gradient(var(--white) 0 2px, var(--black) 2px 3px) 0 3px / 100% calc(100% - 6px) no-repeat, var(--white);
+  display: flex; align-items: center; justify-content: center; height: 24px; border-bottom: 1px solid var(--black);
+  background: repeating-linear-gradient(var(--white) 0 2px, var(--black) 2px 3px) 0 4px / 100% calc(100% - 8px) no-repeat, var(--white);
 }
 .titlebar span { background: var(--white); padding: 0 10px; font-weight: 600; font-size: 14px; }
 
-.menubar {
-  display: flex; align-items: stretch; gap: 2px; min-height: 36px; background: var(--white); border-bottom: 2px solid var(--black);
-  padding: env(safe-area-inset-top, 0px) max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px));
-}
-.menubar .name { font-weight: 700; padding: 0 10px 0 4px; display: flex; align-items: center; }
-.menu { display: flex; align-items: center; gap: 6px; padding: 0 8px; flex: none; border: 0; background: none; min-width: 0; white-space: nowrap; }
-.menu:active, .menu.open { background: var(--black); color: var(--white); }
-#status { flex: 1 1 auto; min-width: 0; justify-content: flex-start; overflow: hidden; }
-#statustext { overflow: hidden; text-overflow: ellipsis; }
-.lamp { flex: none; width: 10px; height: 10px; border: 1.5px solid currentColor; border-radius: 50%; }
-#status.on .lamp { background: currentColor; }
-#status.busy .lamp { animation: blink .6s steps(2) infinite; }
-@keyframes blink { 50% { background: currentColor; } }
-
-.finder { position: relative; min-height: 0; overflow: hidden; }
+#finder { position: fixed; inset: 0; background: var(--black); }
 #vf { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
 #flash { position: absolute; inset: 0; background: var(--white); opacity: 0; pointer-events: none; }
 #flash.go { animation: flash .3s steps(3); }
 @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
 
-/* Hinweisfenster */
 .alert {
-  position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); top: 12px; z-index: 3;
+  position: fixed; z-index: 6; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px));
   background: var(--white); border: 2px solid var(--black); box-shadow: 3px 3px 0 var(--black);
-  display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 10px 12px; font-size: 14px; line-height: 1.35;
+  display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 10px 12px; font-size: 14px; line-height: 1.35; pointer-events: auto;
 }
-.alert b { width: 26px; height: 26px; border: 2px solid var(--black); border-radius: 50%; display: grid; place-items: center; font-size: 16px; }
+.alert b { width: 26px; height: 26px; border: 2px solid var(--black); border-radius: 50%; display: grid; place-items: center; }
 
-/* Bedienpalette */
-.palette {
-  background: var(--white); border-top: 2px solid var(--black); position: relative; z-index: 3;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+/* Unteres Bedienfeld */
+#dock {
+  position: fixed; z-index: 4; left: 0; right: 0; bottom: 0; display: grid; justify-items: center; gap: 14px;
+  padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  transition: transform .25s steps(5);
 }
-.palette .row {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-block: 12px;
-  padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
-}
-.palette .group { display: flex; gap: 8px; }
+.grip { width: 44px; height: 6px; background: var(--white); border: 1.5px solid var(--black); border-radius: 3px; padding: 0; }
+.grip-hit { border: 0; background: none; padding: 8px 20px; margin-bottom: -10px; display: grid; }
+.tools { display: flex; gap: 10px; justify-content: center; transition: opacity .2s steps(4), transform .2s steps(4); }
+body:not([data-level="1"]) .tools { opacity: 0; transform: translateY(16px); pointer-events: none; visibility: hidden; }
 .btn {
-  min-height: 48px; min-width: 64px; padding: 6px 12px; background: var(--white); border: 2px solid var(--black); border-radius: 10px;
-  display: grid; justify-items: center; gap: 2px; font-size: 13px; line-height: 1;
+  min-height: 52px; min-width: 76px; padding: 6px 12px; background: var(--white); border: 2px solid var(--black); border-radius: 10px;
+  display: grid; justify-items: center; align-content: center; gap: 3px; font-size: 13px; line-height: 1;
 }
 .btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; }
-.btn:active, .btn[aria-pressed="true"] { background: var(--black); color: var(--white); }
+.btn:active, .btn[aria-pressed="true"] { background: var(--black); color: var(--white); box-shadow: 0 0 0 2px var(--white); }
 .btn[disabled] { color: #777; border-color: #777; }
-/* Standardknopf mit doppeltem Rahmen wie in Lisa-Dialogen */
-.btn.default { outline: 2px solid var(--black); outline-offset: 2px; }
-#shutter { min-width: 112px; min-height: 64px; font-size: 18px; font-weight: 700; border-radius: 14px; }
+.btn.default { outline: 2px solid var(--black); outline-offset: 2px; box-shadow: 0 0 0 6px var(--white); }
+#shutter { width: 84px; height: 84px; min-width: 0; border-radius: 50%; border-width: 3px; padding: 0; font-size: 0; }
+#shutter::after { content: ""; width: 58px; height: 58px; border-radius: 50%; border: 2px solid var(--black); }
+#shutter:active::after { border-color: var(--white); }
 #shutter[disabled] { background: var(--white); }
+#shutter[disabled]::after { background: repeating-conic-gradient(var(--black) 0 25%, var(--white) 0 50%) 0 0 / 2px 2px; }
+#progress { min-height: 18px; padding: 2px 8px; background: var(--white); border: 1.5px solid var(--black); font-size: 13px; }
+.sheetbar { display: flex; gap: 14px; }
+body[data-level="2"] #dock { transform: translateY(40px); visibility: hidden; }
 
-/* Ausdruck kommt aus dem Schlitz unter der Menüleiste */
-#tray { position: fixed; left: 0; right: 0; top: var(--slot, 40px); bottom: var(--palette, 90px); z-index: 2; overflow: hidden; display: flex; justify-content: center; pointer-events: none; }
-#sheet { position: absolute; background: var(--paper); transform: translateY(-101%); filter: drop-shadow(3px 3px 0 var(--black)); }
-#sheet canvas { display: block; width: 100%; image-rendering: pixelated; }
-#tray.out { pointer-events: auto; }
-#tray.out #sheet { transition: transform var(--eject, 3s) linear; transform: translateY(0); }
-
-dialog {
-  width: min(94vw, 440px); max-height: 90dvh; padding: 0; border: 2px solid var(--black); border-radius: 0;
-  background: var(--white); color: var(--black); box-shadow: 4px 4px 0 var(--black); user-select: text; font-family: var(--ui);
+/* Einstellungen als Fenster von unten */
+#panel {
+  position: fixed; z-index: 5; left: 0; right: 0; bottom: 0; max-height: 86dvh; display: flex; flex-direction: column;
+  background: var(--white); border-top: 2px solid var(--black); box-shadow: 0 -4px 0 var(--black);
+  transform: translateY(105%); transition: transform .28s steps(6); visibility: hidden;
 }
-dialog::backdrop { background-color: transparent; background-image: repeating-conic-gradient(#0008 0 25%, transparent 0 50%); background-size: 2px 2px; }
-dialog form { display: grid; gap: 14px; padding: 14px 16px 16px; }
+body[data-level="2"] #panel { transform: none; visibility: visible; }
+#panel .scroll { overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; user-select: text; }
+#panel form { display: grid; gap: 14px; padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); max-width: 520px; margin: 0 auto; }
 .field { display: grid; gap: 4px; }
 .field label, .check { font-weight: 600; }
 .field small, .check small { font-weight: 400; font-size: 13px; display: block; }
@@ -111,50 +87,59 @@ input[type=range] { width: 100%; height: 30px; accent-color: var(--black); }
 .check input { width: 22px; height: 22px; flex: none; margin: 0; accent-color: var(--black); }
 .val { float: right; font-weight: 400; }
 hr { border: 0; border-top: 1px dotted var(--black); margin: 0; width: 100%; }
+.printer { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
+.lamp { width: 12px; height: 12px; border: 2px solid var(--black); border-radius: 50%; }
+.printer.on .lamp { background: var(--black); }
+.acts { display: flex; gap: 12px; flex-wrap: wrap; }
+.acts .btn { min-height: 44px; font-size: 15px; display: inline-block; min-width: 0; }
 details summary { font-weight: 600; cursor: pointer; min-height: 30px; }
 #diag { margin: 8px 0; max-height: 28dvh; overflow: auto; padding: 8px; border: 1px solid var(--black); font: 11px/1.4 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
-.acts { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; padding-top: 4px; }
-.acts .btn { min-height: 44px; font-size: 15px; display: inline-block; }
-@media (prefers-reduced-motion: reduce) { #tray.out #sheet { transition: none; } #flash.go, #status.busy .lamp { animation: none; } }
+
+/* Ausdruck */
+#tray { position: fixed; left: 0; right: 0; top: 0; bottom: var(--dock, 140px); z-index: 3; overflow: hidden; display: flex; justify-content: center; pointer-events: none;
+  background-color: transparent; }
+#tray.out { background-image: repeating-conic-gradient(#000a 0 25%, transparent 0 50%); background-size: 2px 2px; }
+#sheet { position: absolute; top: 0; background: var(--paper); transform: translateY(-101%); filter: drop-shadow(3px 3px 0 var(--black)); }
+#sheet canvas { display: block; width: 100%; image-rendering: pixelated; }
+#tray.out #sheet { transition: transform var(--eject, 3s) linear; transform: translateY(var(--sheet-y, 16px)); }
+@media (prefers-reduced-motion: reduce) { #tray.out #sheet, #panel, #dock, .tools { transition: none; } #flash.go { animation: none; } }
 </style>
 </head>
-<body>
-<header class="menubar">
-  <span class="name">Sofortbild</span>
-  <button class="menu" id="status" type="button"><span class="lamp"></span><span id="statustext">Drucker verbinden</span></button>
-  <button class="menu" id="gear" type="button">Einstellungen</button>
-</header>
-
-<div class="finder desk" id="finder">
-  <canvas id="vf" width="384" height="700" aria-label="Sucher mit Druckvorschau"></canvas>
+<body data-level="0">
+<div id="finder">
+  <canvas id="vf" width="384" height="800" aria-label="Sucher mit Druckvorschau"></canvas>
   <div id="flash"></div>
-  <div class="alert" id="hintbox" hidden><b>!</b><span id="hint"></span></div>
 </div>
+<div class="alert" id="hintbox" hidden><b>!</b><span id="hint"></span></div>
 
-<footer class="palette" id="palette">
-  <div class="titlebar"><span id="paltitle">Kamera</span></div>
-  <div class="row" id="controls">
-    <div class="group">
-      <button class="btn" id="flip" type="button"><svg viewBox="0 0 24 24"><path d="M4 10a8 8 0 0 1 14-4l2 2M20 4v4h-4M20 14a8 8 0 0 1-14 4l-2-2M4 20v-4h4"/></svg>Wenden</button>
-      <button class="btn" id="torch" type="button" aria-pressed="false" disabled><svg viewBox="0 0 24 24"><path d="M8 3h8v4l-2 3v11h-4V10L8 7z M12 13v3"/></svg>Licht</button>
-    </div>
-    <button class="btn default" id="shutter" type="button">Auslösen</button>
-    <div class="group">
-      <button class="btn" id="pick" type="button"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><path d="m4 17 5-4 3 2.5 4-4 4 4"/></svg>Galerie</button>
-    </div>
+<div id="dock">
+  <div id="progress" hidden></div>
+  <div class="tools" id="tools">
+    <button class="btn" id="flip" type="button"><svg viewBox="0 0 24 24"><path d="M4 10a8 8 0 0 1 14-4l2 2M20 4v4h-4M20 14a8 8 0 0 1-14 4l-2-2M4 20v-4h4"/></svg>Wenden</button>
+    <button class="btn" id="torch" type="button" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M8 3h8v4l-2 3v11h-4V10L8 7z M12 13v3"/></svg>Licht</button>
+    <button class="btn" id="pick" type="button"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><path d="m4 17 5-4 3 2.5 4-4 4 4"/></svg>Galerie</button>
   </div>
-  <div class="row" id="sheetbar" hidden>
+  <div id="controls" style="display:grid;justify-items:center;gap:6px">
+    <button class="grip-hit" id="grip" type="button" aria-label="Mehr Bedienelemente"><span class="grip"></span></button>
+    <button class="btn default" id="shutter" type="button" aria-label="Foto machen und drucken"></button>
+  </div>
+  <div class="sheetbar" id="sheetbar" hidden>
     <button class="btn" id="again" type="button">Nochmal drucken</button>
     <button class="btn default" id="done" type="button">Nächstes Foto</button>
   </div>
-</footer>
+</div>
 
-<div id="tray"><div id="sheet"><canvas id="print"></canvas></div></div>
-<input id="file" type="file" accept="image/*" hidden>
-
-<dialog id="settings">
+<section id="panel" aria-label="Einstellungen">
   <div class="titlebar"><span>Einstellungen</span></div>
-  <form method="dialog">
+  <div class="scroll" id="panelscroll">
+  <form id="settingsform">
+    <div class="printer" id="status"><span class="lamp"></span><span id="statustext">Kein Drucker verbunden</span></div>
+    <div class="acts">
+      <button class="btn" id="connect" type="button">Drucker verbinden</button>
+      <button class="btn" id="forget" type="button">Anderen Drucker wählen</button>
+    </div>
+    <hr>
+
     <div class="field">
       <label for="s-caption">Text unter dem Bild</label>
       <input id="s-caption" type="text" maxlength="28" placeholder="zum Beispiel Omas 80. Geburtstag" autocomplete="off">
@@ -202,12 +187,13 @@ details summary { font-weight: 600; cursor: pointer; min-height: 30px; }
       <pre id="diag"></pre>
       <button class="btn" id="copydiag" type="button" style="display:inline-block">Diagnose kopieren</button>
     </details>
-    <div class="acts">
-      <button class="btn" id="forget" type="button">Anderen Drucker wählen</button>
-      <button class="btn default" type="submit">OK</button>
-    </div>
+    <div class="acts" style="justify-content:flex-end"><button class="btn default" id="closepanel" type="button">Schließen</button></div>
   </form>
-</dialog>
+  </div>
+</section>
+
+<div id="tray"><div id="sheet"><canvas id="print"></canvas></div></div>
+<input id="file" type="file" accept="image/*" hidden>
 
 <script>
 "use strict";
@@ -225,7 +211,7 @@ const FORMATS = { square: 1, tall: 4 / 3, wide: 3 / 4 };
 const ratio = () => {
   if (S.format !== "screen") return FORMATS[S.format] || 1;
   const f = document.getElementById("finder");
-  return Math.min(3, Math.max(1, f.clientHeight / Math.max(1, f.clientWidth)));
+  return Math.min(3, Math.max(.5, f.clientHeight / Math.max(1, f.clientWidth)));
 };
 const photoSize = () => {
   const w = S.frame ? 352 : HEAD_WIDTH;
@@ -466,13 +452,12 @@ let facing = "environment", stream = null, sample = null, lastPage = null, busy 
 
 function hint(text) { $("hint").textContent = text || ""; $("hintbox").hidden = !text; }
 function updateStatus(text) {
-  const el = $("status"), label = $("statustext");
-  el.classList.toggle("on", printer.connected);
-  el.classList.toggle("busy", busy);
-  if (text) { label.textContent = text; return; }
-  label.textContent = printer.connected
-    ? (printer.battery != null ? `${printer.device.name || "Drucker"} · Akku ${printer.battery} %` : (printer.device.name || "Drucker verbunden"))
-    : (printer.device ? "Verbindung getrennt" : "Drucker verbinden");
+  $("status").classList.toggle("on", printer.connected);
+  $("statustext").textContent = printer.connected
+    ? (printer.battery != null ? `${printer.device.name || "Drucker"} verbunden · Akku ${printer.battery} %` : `${printer.device.name || "Drucker"} verbunden`)
+    : (printer.device ? `${printer.device.name || "Drucker"} getrennt` : "Kein Drucker verbunden");
+  $("progress").hidden = !(busy && text);
+  if (busy && text) $("progress").textContent = text;
 }
 printer.onchange = () => updateStatus();
 
@@ -486,29 +471,73 @@ function makeSample() {
   x.fillStyle = "#667"; x.fillRect(0, 335, 400, 65);
   return c;
 }
-/* Taschenlampe: Chrome auf Android kann die Lampe der Rückkamera schalten */
+/* Taschenlampe. Samsung-Handys melden die Lampe oft erst nach dem Start des Bildes,
+   und manche Rückkameras (Weitwinkel, Tele) haben gar keine. Dann wird die Kamera mit Lampe gesucht. */
 let torchOn = false;
+const track = () => stream && stream.getVideoTracks()[0];
+const hasTorch = t => { try { return !!(t && t.getCapabilities && t.getCapabilities().torch); } catch (e) { return false; } };
 function setupTorch() {
-  const track = stream && stream.getVideoTracks()[0];
-  const caps = track && track.getCapabilities ? track.getCapabilities() : {};
   torchOn = false; $("torch").setAttribute("aria-pressed", "false");
-  $("torch").disabled = !caps.torch;
+  const t = track();
+  printer.log(`Kamera: ${t ? t.label : "-"} · Lampe ${hasTorch(t) ? "ja" : "nein"}`);
+}
+async function setTorch(on) {
+  const t = track();
+  if (window.ImageCapture) { try { await new ImageCapture(t).getPhotoCapabilities(); } catch (e) {} }
+  try { await t.applyConstraints({ advanced: [{ torch: on }] }); }
+  catch (e) { await t.applyConstraints({ torch: on }); }
+  torchOn = on; $("torch").setAttribute("aria-pressed", String(on));
+}
+async function findTorchCamera() {
+  const all = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+  for (const d of all) {
+    if (track() && d.deviceId === track().getSettings().deviceId) continue;
+    if (/front|vorne|user/i.test(d.label)) continue;
+    try {
+      const test = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: d.deviceId } } });
+      const t = test.getVideoTracks()[0];
+      await sleep(300);
+      const ok = hasTorch(t);
+      printer.log(`Teste ${d.label || d.deviceId.slice(0, 6)}: Lampe ${ok ? "ja" : "nein"}`);
+      test.getTracks().forEach(x => x.stop());
+      if (ok) return d.deviceId;
+    } catch (e) { printer.log(`Teste ${d.label}: ${e.name}`); }
+  }
+  return null;
 }
 async function toggleTorch() {
-  const track = stream && stream.getVideoTracks()[0];
-  if (!track) return;
+  if (!track()) return hint("Die Kamera läuft nicht, deshalb kann die Lampe nicht angehen.");
+  if (facing === "user") return hint("Die Frontkamera hat keine Lampe. Wechsle mit „Wenden“ zur Rückkamera.");
+  $("torch").disabled = true;
   try {
-    await track.applyConstraints({ advanced: [{ torch: !torchOn }] });
-    torchOn = !torchOn; $("torch").setAttribute("aria-pressed", String(torchOn));
-  } catch (e) { hint("Die Lampe lässt sich mit dieser Kamera nicht einschalten."); }
+    if (!hasTorch(track())) await sleep(500);
+    if (!hasTorch(track())) {
+      hint("Suche die Kamera mit Lampe …");
+      if (stream) stream.getTracks().forEach(x => x.stop());
+      stream = null;
+      const id = await findTorchCamera();
+      if (!id) { await startCamera(); return hint("Keine Rückkamera meldet eine Lampe. Unter Einstellungen → Diagnose steht, welche Kameras gefunden wurden."); }
+      try { localStorage.setItem("sofortbild-cam", id); } catch (e) {}
+      await startCamera();
+    }
+    await setTorch(!torchOn);
+    hint("");
+  } catch (e) {
+    printer.log("Lampe: " + e.name + " " + e.message);
+    hint("Die Lampe lässt sich nicht einschalten. Unter Einstellungen → Diagnose steht der Grund.");
+  } finally { $("torch").disabled = false; }
 }
 async function startCamera() {
-  $("torch").disabled = true;
   if (stream) stream.getTracks().forEach(t => t.stop());
   stream = null;
   try {
     if (!navigator.mediaDevices) throw new Error("no media");
-    stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 1280 } } });
+    let saved = null; try { saved = localStorage.getItem("sofortbild-cam"); } catch (e) {}
+    const size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+    if (facing === "environment" && saved) {
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { deviceId: { exact: saved }, ...size } }); } catch (e) { stream = null; }
+    }
+    if (!stream) stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing }, ...size } });
     video.srcObject = stream; await video.play();
     hint(""); stillSource = null;
     setupTorch();
@@ -526,7 +555,7 @@ const source = () => stillSource
 let lastFrame = 0;
 function loop(t) {
   requestAnimationFrame(loop);
-  if (document.hidden || t - lastFrame < 90 || !$("sheetbar").hidden) return;
+  if (document.hidden || t - lastFrame < 90 || !$("sheetbar").hidden || document.body.dataset.level === "2") return;
   lastFrame = t;
   const s = source(), p = photoBits(s.src, s.w, s.h, s.mirror);
   if (vf.width !== p.w || vf.height !== p.h) { vf.width = p.w; vf.height = p.h; }
@@ -536,15 +565,16 @@ function loop(t) {
 function showSheet(page) {
   const c = $("print"); c.width = page.w; c.height = page.h;
   paintBits(c.getContext("2d"), page.bits, page.w, page.h);
-  $("controls").hidden = true; $("sheetbar").hidden = false; $("paltitle").textContent = "Ausdruck";
+  setLevel(0);
+  $("controls").hidden = true; $("sheetbar").hidden = false;
   const tray = $("tray"), sheet = $("sheet"), root = document.documentElement.style;
-  const slot = document.querySelector(".menubar").getBoundingClientRect().bottom;
-  const pal = innerHeight - $("palette").getBoundingClientRect().top;
-  root.setProperty("--slot", slot + "px"); root.setProperty("--palette", pal + "px");
-  const room = innerHeight - slot - pal - 16;
+  const dock = innerHeight - $("dock").getBoundingClientRect().top;
+  root.setProperty("--dock", dock + "px");
+  const room = innerHeight - dock - 32;
   const width = Math.min(innerWidth * .86, 360, room * page.w / page.h);
   tray.classList.remove("out");
-  sheet.style.width = width + "px"; sheet.style.top = "0px";
+  sheet.style.width = width + "px";
+  root.setProperty("--sheet-y", Math.max(16, (room - width * page.h / page.w) / 2 + 16) + "px");
   void sheet.offsetWidth;
   root.setProperty("--eject", Math.max(2, page.h / 200) + "s");
   requestAnimationFrame(() => tray.classList.add("out"));
@@ -552,7 +582,7 @@ function showSheet(page) {
 function hideSheet() {
   $("tray").classList.remove("out");
   $("sheet").style.transition = "none";
-  $("sheetbar").hidden = true; $("controls").hidden = false; $("paltitle").textContent = "Kamera";
+  $("sheetbar").hidden = true; $("controls").hidden = false;
   requestAnimationFrame(() => { $("sheet").style.transition = ""; });
 }
 function friendly(e) {
@@ -620,14 +650,39 @@ $("file").addEventListener("change", e => {
   img.onerror = () => hint("Dieses Bild kann der Browser nicht öffnen. Wähle ein JPEG oder PNG.");
   img.src = URL.createObjectURL(f); e.target.value = "";
 });
-$("status").addEventListener("click", async () => {
+$("connect").addEventListener("click", async () => {
   if (busy) return;
   try { await ensurePrinter(); hint(""); updateStatus(); }
   catch (e) { updateStatus(); const m = friendly(e); if (m) hint(m); }
 });
 const diagText = () => [`Sofortbild ${navigator.userAgent}`, ...printer.diag].join("\n") || "Noch keine Daten. Verbinde den Drucker und drück einmal den Auslöser.";
-$("gear").addEventListener("click", () => { fillSettings(); $("diag").textContent = diagText(); $("gear").classList.add("open"); $("settings").showModal(); });
-$("settings").addEventListener("close", () => $("gear").classList.remove("open"));
+/* Wischstufen: 0 nur Auslöser, 1 Werkzeuge, 2 Einstellungen */
+function setLevel(n) {
+  const body = document.body, was = +body.dataset.level;
+  n = Math.max(0, Math.min(2, n));
+  if (n === 2 && was !== 2) { fillSettings(); $("diag").textContent = diagText(); $("panelscroll").scrollTop = 0; }
+  if (n !== 2 && document.activeElement && $("panel").contains(document.activeElement)) document.activeElement.blur();
+  body.dataset.level = n;
+}
+let swipe = null, lastSwipe = 0;
+addEventListener("pointerdown", e => {
+  if (!$("sheetbar").hidden) return;
+  if (e.target.closest("input, select, textarea, pre")) return;
+  swipe = { x: e.clientX, y: e.clientY, t: performance.now(), top: $("panelscroll").scrollTop, inPanel: !!e.target.closest("#panel") };
+});
+addEventListener("pointerup", e => {
+  if (!swipe) return;
+  const dx = e.clientX - swipe.x, dy = swipe.y - e.clientY, s = swipe; swipe = null;
+  if (Math.abs(dy) < 50 || Math.abs(dy) < Math.abs(dx) * 1.3 || performance.now() - s.t > 800) return;
+  lastSwipe = performance.now();
+  const level = +document.body.dataset.level;
+  if (dy > 0) { if (!s.inPanel) setLevel(level + 1); }
+  else if (!s.inPanel || s.top <= 0) setLevel(level - 1);
+});
+addEventListener("pointercancel", () => { swipe = null; });
+$("grip").addEventListener("click", () => setLevel(+document.body.dataset.level + 1));
+$("finder").addEventListener("click", () => { if (performance.now() - lastSwipe > 300 && document.body.dataset.level === "1") setLevel(0); });
+$("closepanel").addEventListener("click", () => setLevel(0));
 $("copydiag").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(diagText()); $("copydiag").textContent = "Kopiert"; }
   catch (e) { const r = document.createRange(); r.selectNodeContents($("diag")); getSelection().removeAllRanges(); getSelection().addRange(r); $("copydiag").textContent = "Markiert, jetzt kopieren"; }
@@ -636,7 +691,7 @@ $("copydiag").addEventListener("click", async () => {
 $("forget").addEventListener("click", () => {
   if (printer.device && printer.device.gatt.connected) printer.device.gatt.disconnect();
   printer.device = null; printer.ae01 = null; printer.battery = null;
-  $("settings").close(); updateStatus();
+  updateStatus();
 });
 const F = { format: "s-format", dither: "s-dither", bright: "s-bright", dark: "s-dark", frame: "s-frame", caption: "s-caption", rotate: "s-rotate", compare: "s-compare", date: "s-date", feed: "s-feed" };
 function fillSettings() {
