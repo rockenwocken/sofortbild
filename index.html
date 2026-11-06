@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17444f">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Sofortbild</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Spline+Sans+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: ein Kameragehäuse aus lackiertem Blech – Sucher oben, Papierschlitz, Auslöser. */
+:root {
+  --body: #17444f; --body-hi: #215a67; --body-lo: #0e2f37;
+  --paper: #f3f1e8; --ink: #1a1c1c;
+  --shutter: #f2c230; --shutter-lo: #b98d10;
+  --label: #cfe3e0; --good: #9fe0a8; --bad: #ffb4a0;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --mono: "Spline Sans Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--body); color: var(--label); font: 15px/1.4 var(--display);
+  display: flex; justify-content: center; overflow: hidden; user-select: none;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--shutter); outline-offset: 2px; }
+.camera {
+  width: 100%; max-width: 480px; height: 100%; display: flex; flex-direction: column; gap: 12px;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { font-weight: 800; font-size: 24px; letter-spacing: -.02em; color: var(--paper); }
+.pill {
+  display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; min-width: 0;
+  background: var(--body-lo); border: 0; border-radius: 20px; font: 400 12px var(--mono); text-align: left;
+}
+.dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--bad); }
+.pill.on .dot { background: var(--good); box-shadow: 0 0 8px var(--good); }
+.pill.busy .dot { background: var(--shutter); animation: blink .7s infinite alternate; }
+@keyframes blink { to { opacity: .25; } }
+
+.finder {
+  position: relative; flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--paper); border-radius: 6px 6px 0 0; overflow: hidden;
+  box-shadow: inset 0 0 0 5px var(--body-lo);
+}
+#vf { max-width: calc(100% - 10px); max-height: calc(100% - 10px); image-rendering: pixelated; display: block; }
+#flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+#flash.go { animation: flash .35s ease-out; }
+@keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+.hint {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; padding: 8px 12px; border-radius: 4px;
+  background: var(--ink); color: var(--paper); font: 400 12px/1.4 var(--mono);
+}
+
+.slot { flex: none; height: 12px; margin-top: -12px; background: linear-gradient(var(--body-lo) 40%, #061a1f); border-radius: 0 0 4px 4px; position: relative; z-index: 3; }
+
+.deck { position: relative; flex: none; height: 148px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.side { display: flex; gap: 8px; }
+.side.r { justify-content: flex-end; }
+.tool {
+  width: 52px; height: 52px; display: grid; place-items: center; background: var(--body-hi); border: 0; border-radius: 12px;
+}
+.tool svg { width: 24px; height: 24px; fill: none; stroke: var(--paper); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tool[disabled] { opacity: .35; }
+#shutter {
+  width: 112px; height: 112px; border-radius: 50%; border: 7px solid var(--body-lo);
+  background: radial-gradient(circle at 38% 30%, #ffe27a, var(--shutter) 55%, var(--shutter-lo));
+  box-shadow: 0 7px 0 var(--body-lo); transition: transform .08s, box-shadow .08s;
+}
+#shutter:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--body-lo); }
+#shutter[disabled] { filter: saturate(.3) brightness(.75); }
+
+/* Der Ausdruck schiebt sich aus dem Schlitz über Sucher und Bedienfeld */
+#tray { position: fixed; inset: 0 0 auto; height: var(--tray, 70dvh); z-index: 2; pointer-events: none; overflow: hidden; display: flex; justify-content: center; transition: background .3s; filter: drop-shadow(0 6px 14px #0009); }
+#tray.out { background: #0e2f37e6; }
+#sheet {
+  position: absolute; background: var(--paper);
+  transform: translateY(var(--from, 100dvh)); pointer-events: auto;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 96% 99%, 92% 100%, 88% 99%, 84% 100%, 80% 99%, 76% 100%, 72% 99%, 68% 100%, 64% 99%, 60% 100%, 56% 99%, 52% 100%, 48% 99%, 44% 100%, 40% 99%, 36% 100%, 32% 99%, 28% 100%, 24% 99%, 20% 100%, 16% 99%, 12% 100%, 8% 99%, 4% 100%, 0 99%);
+}
+#sheet canvas { display: block; width: 100%; image-rendering: pixelated; }
+#tray.out #sheet { transition: transform var(--eject, 3s) linear; transform: translateY(0); }
+#sheetbar {
+  position: fixed; left: 0; right: 0; bottom: 0; top: var(--tray, 70dvh); z-index: 4; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--body);
+  padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
+}
+#sheetbar button { min-height: 48px; padding: 8px 20px; border: 0; border-radius: 24px; background: var(--ink); color: var(--paper); font-weight: 500; box-shadow: 0 3px 12px #0008; }
+#sheetbar .main { background: var(--shutter); color: var(--ink); }
+
+dialog {
+  width: min(92vw, 420px); max-height: 88dvh; border: 0; border-radius: 10px; padding: 20px;
+  background: var(--paper); color: var(--ink); user-select: text;
+}
+dialog::backdrop { background: #0009; }
+dialog h2 { margin: 0 0 14px; font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+form { display: grid; gap: 14px; }
+.row { display: grid; gap: 4px; }
+.row label, .check { font-weight: 500; }
+.row small, .check small { font: 400 12px/1.4 var(--mono); opacity: .7; display: block; }
+select, input[type=text] { width: 100%; min-height: 44px; padding: 8px 10px; font: 15px var(--display); color: var(--ink); background: #fff; border: 1.5px solid var(--ink); border-radius: 6px; }
+input[type=range] { width: 100%; accent-color: var(--body); height: 32px; }
+.check { display: flex; gap: 10px; align-items: flex-start; }
+.check input { width: 22px; height: 22px; flex: none; margin: 1px 0 0; accent-color: var(--body); }
+.val { float: right; font: 400 13px var(--mono); }
+.acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.acts button { flex: 1 1 auto; min-height: 46px; border: 1.5px solid var(--ink); border-radius: 6px; background: none; color: var(--ink); padding: 8px 12px; }
+.acts .main { background: var(--body); border-color: var(--body); color: var(--paper); }
+@media (max-height: 620px) { .deck { height: 116px; } #shutter { width: 88px; height: 88px; } }
+@media (prefers-reduced-motion: reduce) { #tray.out #sheet { transition: none; } #flash.go, .pill.busy .dot { animation: none; } }
+</style>
+</head>
+<body>
+<main class="camera">
+  <header class="top">
+    <div class="brand">Sofortbild</div>
+    <button class="pill" id="status" type="button"><span class="dot"></span><span id="statustext">Drucker verbinden</span></button>
+  </header>
+
+  <div class="finder">
+    <canvas id="vf" width="352" height="352" aria-label="Sucher mit Druckvorschau"></canvas>
+    <div id="flash"></div>
+    <div class="hint" id="hint" hidden></div>
+  </div>
+  <div class="slot"></div>
+
+  <div class="deck">
+    <div class="side">
+      <button class="tool" id="flip" type="button" aria-label="Kamera wechseln" title="Kamera wechseln">
+        <svg viewBox="0 0 24 24"><path d="M4 10a8 8 0 0 1 14-4l2 2M20 4v4h-4M20 14a8 8 0 0 1-14 4l-2-2M4 20v-4h4"/></svg>
+      </button>
+    </div>
+    <button id="shutter" type="button" aria-label="Foto machen und drucken"></button>
+    <div class="side r">
+      <button class="tool" id="pick" type="button" aria-label="Foto aus der Galerie drucken" title="Foto aus der Galerie">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-4 3 2.5 4-4 4 4"/></svg>
+      </button>
+      <button class="tool" id="gear" type="button" aria-label="Einstellungen" title="Einstellungen">
+        <svg viewBox="0 0 24 24"><path d="M4 7h9M18 7h2M4 17h2M11 17h9"/><circle cx="15.5" cy="7" r="2.5"/><circle cx="8.5" cy="17" r="2.5"/></svg>
+      </button>
+    </div>
+  </div>
+</main>
+
+<div id="tray"><div id="sheet"><canvas id="print"></canvas></div></div>
+<div id="sheetbar" hidden>
+  <button id="again" type="button">Nochmal drucken</button>
+  <button id="done" class="main" type="button">Nächstes Foto</button>
+</div>
+
+<input id="file" type="file" accept="image/*" hidden>
+
+<dialog id="settings">
+  <h2>Einstellungen</h2>
+  <form method="dialog">
+    <div class="row">
+      <label for="s-format">Bildformat</label>
+      <select id="s-format">
+        <option value="square">Quadrat wie ein Polaroid</option>
+        <option value="tall">Hochformat 3:4</option>
+        <option value="wide">Querformat 4:3</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="s-dither">Punktmuster</label>
+      <select id="s-dither">
+        <option value="atkinson">Atkinson: kräftig, kontrastreich</option>
+        <option value="floyd">Floyd-Steinberg: feine Verläufe</option>
+        <option value="bayer">Raster: Retro-Look</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="s-bright">Bildhelligkeit <span class="val" id="v-bright"></span></label>
+      <input id="s-bright" type="range" min="60" max="170" step="5">
+    </div>
+    <div class="row">
+      <label for="s-dark">Druckstärke <span class="val" id="v-dark"></span></label>
+      <input id="s-dark" type="range" min="20" max="100" step="5">
+      <small>Höher wird schwärzer, leert aber den Akku schneller.</small>
+    </div>
+    <label class="check"><input id="s-frame" type="checkbox"><span>Weißer Rahmen mit Datum</span></label>
+    <div class="row">
+      <label for="s-caption">Eigener Text unter dem Foto</label>
+      <input id="s-caption" type="text" maxlength="28" placeholder="zum Beispiel Omas 80. Geburtstag" autocomplete="off">
+    </div>
+    <label class="check"><input id="s-rotate" type="checkbox"><span>Druck um 180° drehen<small>Einschalten, falls das Foto auf dem Kopf aus dem Drucker kommt.</small></span></label>
+    <div class="acts">
+      <button id="forget" type="button">Anderen Drucker wählen</button>
+      <button class="main" type="submit">Fertig</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+"use strict";
+/* ---------- Einstellungen ---------- */
+const DEFAULTS = { format: "square", dither: "atkinson", bright: 110, dark: 80, frame: true, caption: "", rotate: false };
+const S = { ...DEFAULTS };
+try { Object.assign(S, JSON.parse(localStorage.getItem("sofortbild") || "{}")); } catch (e) {}
+const save = () => { try { localStorage.setItem("sofortbild", JSON.stringify(S)); } catch (e) {} };
+
+/* ---------- Bildverarbeitung ---------- */
+const HEAD_WIDTH = 384;
+const FORMATS = { square: 1, tall: 4 / 3, wide: 3 / 4 };
+const photoSize = () => {
+  const w = S.frame ? 352 : HEAD_WIDTH;
+  return { w, h: Math.round(w * FORMATS[S.format]) };
+};
+const scratch = document.createElement("canvas");
+const sctx = scratch.getContext("2d", { willReadFrequently: true });
+
+function grayCover(src, sw, sh, w, h, mirror) {
+  scratch.width = w; scratch.height = h;
+  const scale = Math.max(w / sw, h / sh), cw = w / scale, ch = h / scale;
+  sctx.save();
+  if (mirror) { sctx.translate(w, 0); sctx.scale(-1, 1); }
+  sctx.drawImage(src, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, w, h);
+  sctx.restore();
+  const d = sctx.getImageData(0, 0, w, h).data, g = new Float32Array(w * h);
+  for (let i = 0; i < g.length; i++) g[i] = .299 * d[i * 4] + .587 * d[i * 4 + 1] + .114 * d[i * 4 + 2];
+  return g;
+}
+/* Kontrast automatisch strecken: Thermopapier kennt nur Schwarz und Weiß */
+function tone(g, bright) {
+  const hist = new Uint32Array(256);
+  for (const v of g) hist[v | 0]++;
+  const cut = g.length * .01; let lo = 0, hi = 255, sum = 0;
+  while (lo < 255 && (sum += hist[lo]) < cut) lo++;
+  sum = 0; while (hi > 0 && (sum += hist[hi]) < cut) hi--;
+  const span = Math.max(30, hi - lo), gamma = 1 / bright;
+  for (let i = 0; i < g.length; i++) {
+    const n = Math.min(1, Math.max(0, (g[i] - lo) / span));
+    g[i] = 255 * Math.pow(n, gamma);
+  }
+}
+const BAYER = [0, 48, 12, 60, 3, 51, 15, 63, 32, 16, 44, 28, 35, 19, 47, 31, 8, 56, 4, 52, 11, 59, 7, 55, 40, 24, 36, 20, 43, 27, 39, 23, 2, 50, 14, 62, 1, 49, 13, 61, 34, 18, 46, 30, 33, 17, 45, 29, 10, 58, 6, 54, 9, 57, 5, 53, 42, 26, 38, 22, 41, 25, 37, 21];
+/* Ergebnis: 1 = schwarzer Punkt */
+function dither(g, w, h, kind) {
+  const out = new Uint8Array(w * h);
+  if (kind === "bayer") {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+      out[y * w + x] = g[y * w + x] < (BAYER[(y & 7) * 8 + (x & 7)] + .5) * 4 ? 1 : 0;
+    return out;
+  }
+  const spread = kind === "floyd"
+    ? [[1, 0, 7 / 16], [-1, 1, 3 / 16], [0, 1, 5 / 16], [1, 1, 1 / 16]]
+    : [[1, 0, 1 / 8], [2, 0, 1 / 8], [-1, 1, 1 / 8], [0, 1, 1 / 8], [1, 1, 1 / 8], [0, 2, 1 / 8]];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, old = g[i], black = old < 128;
+    out[i] = black ? 1 : 0;
+    const err = old - (black ? 0 : 255);
+    for (const [dx, dy, k] of spread) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && nx < w && ny < h) g[ny * w + nx] += err * k;
+    }
+  }
+  return out;
+}
+function paintBits(ctx, bits, w, h, x = 0, y = 0) {
+  const img = ctx.createImageData(w, h), d = img.data;
+  for (let i = 0; i < bits.length; i++) {
+    const v = bits[i] ? 26 : 243;
+    d[i * 4] = v; d[i * 4 + 1] = v; d[i * 4 + 2] = bits[i] ? 28 : 232; d[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, x, y);
+}
+function photoBits(src, sw, sh, mirror) {
+  const { w, h } = photoSize();
+  const g = grayCover(src, sw, sh, w, h, mirror);
+  tone(g, S.bright / 100);
+  return { bits: dither(g, w, h, S.dither), w, h };
+}
+/* Fertige Druckseite: 384 Punkte breit, inklusive Rahmen, Text und Abreißkante */
+const TEAR_LINES = 70;
+function composePage(p, now = new Date()) {
+  const c = document.createElement("canvas"), m = S.frame ? 16 : 0;
+  const caption = S.frame ? [S.caption.trim(), now.toLocaleDateString("de-DE") + "  " + now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })].filter(Boolean) : [];
+  const textH = caption.length ? 16 + caption.length * 30 : m;
+  c.width = HEAD_WIDTH; c.height = m + p.h + textH + TEAR_LINES;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
+  paintBits(x, p.bits, p.w, p.h, m, m);
+  x.fillStyle = "#000"; x.textAlign = "center"; x.textBaseline = "top";
+  caption.forEach((t, i) => {
+    x.font = (i === caption.length - 1 ? "600 20px " : "600 24px ") + '"Spline Sans Mono", monospace';
+    x.fillText(t, HEAD_WIDTH / 2, m + p.h + 14 + i * 30, HEAD_WIDTH - 2 * m);
+  });
+  const d = x.getImageData(0, 0, c.width, c.height).data, bits = new Uint8Array(c.width * c.height);
+  for (let i = 0; i < bits.length; i++) bits[i] = d[i * 4 + 1] < 128 ? 1 : 0;
+  return { bits, w: c.width, h: c.height };
+}
+/* Eine Bytezeile enthält 8 Punkte, das niedrigste Bit ist der linke Punkt */
+function packPage(page, rotate) {
+  const rowBytes = page.w >> 3, out = new Uint8Array(rowBytes * page.h);
+  const src = rotate ? page.bits.slice().reverse() : page.bits;
+  for (let i = 0; i < src.length; i++) if (src[i]) out[i >> 3] |= 1 << (i & 7);
+  return { data: out, rowBytes, lines: page.h };
+}
+
+/* ---------- Druckerprotokolle ---------- */
+function crc8(bytes) {
+  let crc = 0;
+  for (const b of bytes) { crc ^= b; for (let i = 0; i < 8; i++) crc = crc & 0x80 ? ((crc << 1) ^ 7) & 255 : (crc << 1) & 255; }
+  return crc;
+}
+const frame = (a, b, cmd, payload) => {
+  const n = payload.length;
+  return Uint8Array.from([a, b, cmd, 0, n & 255, n >> 8, ...payload, crc8(payload), 0xff]);
+};
+const mxw = (cmd, payload) => frame(0x22, 0x21, cmd, payload);
+const old = (cmd, payload) => frame(0x51, 0x78, cmd, payload);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const PAPER_ERRORS = { 1: "Kein Papier im Drucker. Lege eine Rolle ein.", 9: "Kein Papier im Drucker. Lege eine Rolle ein.", 4: "Der Drucker ist zu heiß. Lass ihn kurz abkühlen.", 8: "Der Drucker-Akku ist fast leer. Lade ihn auf." };
+
+class Printer {
+  constructor() { this.device = null; this.protocol = null; this.battery = null; this.waiters = []; this.paused = false; this.onchange = () => {}; }
+  get connected() { return !!(this.device && this.device.gatt.connected && this.ae01); }
+  async pick() {
+    const names = ["MX", "GB", "GT", "YT", "X", "Fun", "MTP", "Printer", "Mini", "C"];
+    this.device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [0xae30] }, { services: [0xaf30] }, ...names.map(namePrefix => ({ namePrefix }))],
+      optionalServices: [0xae30, 0xaf30]
+    });
+    this.device.addEventListener("gattserverdisconnected", () => { this.ae01 = null; this.onchange(); });
+  }
+  async connect() {
+    const server = await this.device.gatt.connect();
+    let service;
+    try { service = await server.getPrimaryService(0xae30); }
+    catch (e) { service = await server.getPrimaryService(0xaf30); }
+    this.ae01 = await service.getCharacteristic(0xae01);
+    this.ae02 = await service.getCharacteristic(0xae02);
+    this.ae03 = await service.getCharacteristic(0xae03).catch(() => null);
+    /* MXW01 nimmt Bilddaten auf AE03 an, ältere Modelle auf AE01 */
+    this.protocol = this.ae03 && (this.ae03.properties.writeWithoutResponse || this.ae03.properties.write) ? "mxw01" : "classic";
+    await this.ae02.startNotifications();
+    this.ae02.addEventListener("characteristicvaluechanged", e => this.notified(new Uint8Array(e.target.value.buffer)));
+    if (this.protocol === "mxw01") await this.status().catch(() => {});
+    this.onchange();
+  }
+  notified(b) {
+    if (b[0] === 0x51 && b[1] === 0x78 && b[2] === 0xae) { this.paused = b[6] === 0x10; return; }
+    if (b[0] !== 0x22 || b[1] !== 0x21) return;
+    const n = b[4] | (b[5] << 8), msg = { cmd: b[2], payload: b.slice(6, 6 + n) };
+    this.waiters = this.waiters.filter(w => { if (w.cmd !== msg.cmd) return true; clearTimeout(w.t); w.ok(msg); return false; });
+  }
+  waitFor(cmd, ms, what) {
+    return new Promise((ok, no) => {
+      const w = { cmd, ok, t: setTimeout(() => { this.waiters = this.waiters.filter(x => x !== w); no(new Error(what)); }, ms) };
+      this.waiters.push(w);
+    });
+  }
+  send(ch, bytes) { return ch.properties.writeWithoutResponse ? ch.writeValueWithoutResponse(bytes) : ch.writeValue(bytes); }
+  async status() {
+    const wait = this.waitFor(0xa1, 3000, "Der Drucker antwortet nicht auf die Statusabfrage.");
+    await this.send(this.ae01, mxw(0xa1, [0]));
+    const { payload: p } = await wait;
+    if (p.length >= 13) {
+      this.battery = p[9];
+      if (p[12] !== 0 && p.length > 13) throw new Error(PAPER_ERRORS[p[13]] || `Der Drucker meldet Fehler ${p[13]}.`);
+    }
+  }
+  async stream(ch, bytes, size, gap, onprogress) {
+    for (let i = 0; i < bytes.length; i += size) {
+      while (this.paused) await sleep(20);
+      await this.send(ch, bytes.subarray(i, i + size));
+      await sleep(gap);
+      onprogress && onprogress(Math.min(1, (i + size) / bytes.length));
+    }
+  }
+  async printMxw({ data, lines }, darkness, onprogress) {
+    await this.status().catch(e => { if (PAPER_ERRORS[e.message] || /Papier|heiß|Akku|Fehler/.test(e.message)) throw e; });
+    await this.send(this.ae01, mxw(0xa2, [Math.round(darkness * 255)]));
+    const accepted = this.waitFor(0xa9, 3000, "Der Drucker hat den Druckauftrag nicht bestätigt.");
+    await this.send(this.ae01, mxw(0xa9, [lines & 255, lines >> 8, 0x30, 0x00]));
+    const { payload } = await accepted;
+    if (payload[0] === 1) throw new Error("Der Drucker hat den Auftrag abgelehnt. Prüfe Papier und Akku.");
+    const finished = this.waitFor(0xaa, 120000, "Der Drucker hat das Ende des Drucks nicht gemeldet.");
+    finished.catch(() => {});
+    await this.stream(this.ae03, data, 100, 12, onprogress);
+    await this.send(this.ae01, mxw(0xad, [0]));
+    await finished;
+  }
+  async printClassic({ data, rowBytes, lines }, darkness, onprogress) {
+    const energy = Math.round(darkness * 0xffff), parts = [
+      old(0xa3, [0]), old(0xa4, [0x32]), old(0xaf, [energy & 255, energy >> 8]), old(0xbe, [1]), old(0xbd, [25]),
+      old(0xa6, [0xaa, 0x55, 0x17, 0x38, 0x44, 0x5f, 0x5f, 0x5f, 0x44, 0x38, 0x2c])
+    ];
+    for (let y = 0; y < lines; y++) parts.push(old(0xa2, [...data.subarray(y * rowBytes, (y + 1) * rowBytes)]));
+    parts.push(old(0xa6, [0xaa, 0x55, 0x17, 0, 0, 0, 0, 0, 0, 0, 0x17]), old(0xa3, [0]));
+    const total = parts.reduce((n, p) => n + p.length, 0), all = new Uint8Array(total);
+    let at = 0; for (const p of parts) { all.set(p, at); at += p.length; }
+    await this.stream(this.ae01, all, 100, 20, onprogress);
+  }
+  print(packed, darkness, onprogress) {
+    return this.protocol === "mxw01" ? this.printMxw(packed, darkness, onprogress) : this.printClassic(packed, darkness, onprogress);
+  }
+}
+
+/* ---------- Oberfläche ---------- */
+const $ = id => document.getElementById(id);
+const vf = $("vf"), vctx = vf.getContext("2d");
+const printer = new Printer();
+const video = document.createElement("video");
+video.playsInline = true; video.muted = true;
+let facing = "environment", stream = null, sample = null, lastPage = null, busy = false, stillSource = null;
+
+function hint(text) { $("hint").textContent = text || ""; $("hint").hidden = !text; }
+function updateStatus(text) {
+  const el = $("status"), label = $("statustext");
+  el.classList.toggle("on", printer.connected);
+  el.classList.toggle("busy", busy);
+  if (text) { label.textContent = text; return; }
+  label.textContent = printer.connected
+    ? (printer.battery != null ? `${printer.device.name || "Drucker"} · Akku ${printer.battery} %` : (printer.device.name || "Drucker verbunden"))
+    : (printer.device ? "Verbindung getrennt" : "Drucker verbinden");
+}
+printer.onchange = () => updateStatus();
+
+/* Ersatzmotiv, solange keine Kamera verfügbar ist */
+function makeSample() {
+  const c = document.createElement("canvas"); c.width = 400; c.height = 400;
+  const x = c.getContext("2d"), sky = x.createLinearGradient(0, 0, 0, 300);
+  sky.addColorStop(0, "#335"); sky.addColorStop(1, "#fda"); x.fillStyle = sky; x.fillRect(0, 0, 400, 400);
+  x.fillStyle = "#fff"; x.beginPath(); x.arc(280, 150, 52, 0, 7); x.fill();
+  x.fillStyle = "#223"; x.beginPath(); x.moveTo(0, 300); x.lineTo(110, 170); x.lineTo(190, 270); x.lineTo(260, 205); x.lineTo(400, 320); x.lineTo(400, 400); x.lineTo(0, 400); x.fill();
+  x.fillStyle = "#667"; x.fillRect(0, 335, 400, 65);
+  return c;
+}
+async function startCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  try {
+    if (!navigator.mediaDevices) throw new Error("no media");
+    stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 1280 } } });
+    video.srcObject = stream; await video.play();
+    hint(""); stillSource = null;
+  } catch (e) {
+    sample = sample || makeSample();
+    hint("Die Kamera ist nicht freigegeben. Erlaube sie in Chrome oder wähle rechts ein Foto aus der Galerie. Bis dahin siehst du ein Beispielbild.");
+  }
+}
+const source = () => stillSource
+  ? { src: stillSource, w: stillSource.naturalWidth || stillSource.width, h: stillSource.naturalHeight || stillSource.height, mirror: false }
+  : (stream && video.videoWidth)
+    ? { src: video, w: video.videoWidth, h: video.videoHeight, mirror: facing === "user" }
+    : { src: sample || (sample = makeSample()), w: 400, h: 400, mirror: false };
+
+let lastFrame = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (document.hidden || t - lastFrame < 90 || !$("sheetbar").hidden) return;
+  lastFrame = t;
+  const s = source(), p = photoBits(s.src, s.w, s.h, s.mirror);
+  if (vf.width !== p.w || vf.height !== p.h) { vf.width = p.w; vf.height = p.h; }
+  paintBits(vctx, p.bits, p.w, p.h);
+}
+
+function showSheet(page) {
+  const c = $("print"); c.width = page.w; c.height = page.h;
+  const x = c.getContext("2d"); paintBits(x, page.bits, page.w, page.h);
+  const tray = $("tray"), sheet = $("sheet"), root = document.documentElement.style;
+  const room = document.querySelector(".slot").getBoundingClientRect().top;
+  const width = Math.min(innerWidth * .82, 340, (room - 76) * page.w / page.h);
+  const height = width * page.h / page.w, top = Math.max(64, (room - height) / 2 + 20);
+  tray.classList.remove("out");
+  sheet.style.width = width + "px"; sheet.style.top = top + "px";
+  root.setProperty("--tray", room + "px"); root.setProperty("--from", (room - top) + "px");
+  void sheet.offsetWidth;
+  root.setProperty("--eject", Math.max(2, page.h / 180) + "s");
+  $("sheetbar").hidden = false;
+  requestAnimationFrame(() => tray.classList.add("out"));
+}
+function hideSheet() {
+  $("tray").classList.remove("out");
+  $("sheet").style.transition = "none";
+  $("sheetbar").hidden = true;
+  requestAnimationFrame(() => { $("sheet").style.transition = ""; });
+}
+function friendly(e) {
+  if (e && e.name === "NotFoundError") return null;
+  if (e && e.name === "NetworkError") return "Die Verbindung ist abgebrochen. Schalte den Drucker ein, bring ihn näher ans Handy und versuche es nochmal.";
+  if (e && e.name === "SecurityError") return "Chrome blockiert Bluetooth auf dieser Seite. Die App muss über eine https-Adresse laufen.";
+  return (e && e.message) || "Der Druck ist fehlgeschlagen.";
+}
+const canBluetooth = () => !!navigator.bluetooth;
+const NO_BT = "Dieser Browser kann nicht direkt mit Bluetooth-Druckern sprechen. Öffne die Seite in Chrome auf Android. Auf dem iPhone geht es nur mit der Bluefy-App.";
+
+/* Muss direkt aus dem Fingertipp starten, sonst verweigert Chrome die Geräteauswahl */
+async function ensurePrinter() {
+  if (!canBluetooth()) throw new Error(NO_BT);
+  if (!printer.device) await printer.pick();
+  if (!printer.connected) { updateStatus("Verbinde …"); await printer.connect(); }
+}
+async function runPrint(page) {
+  if (busy) return;
+  busy = true; $("shutter").disabled = true; $("again").disabled = true;
+  try {
+    const connecting = ensurePrinter();
+    updateStatus();
+    await connecting;
+    updateStatus("Druckt …");
+    await printer.print(packPage(page, S.rotate), S.dark / 100, f => updateStatus(`Druckt … ${Math.round(f * 100)} %`));
+    busy = false; hint(""); updateStatus();
+  } catch (e) {
+    busy = false; updateStatus();
+    const msg = friendly(e);
+    if (msg) { hint(msg); $("sheetbar").hidden = true; $("tray").classList.remove("out"); }
+    else updateStatus();
+  } finally {
+    $("shutter").disabled = false; $("again").disabled = false;
+  }
+}
+function shoot() {
+  if (busy) return;
+  const fl = $("flash"); fl.classList.remove("go"); void fl.offsetWidth; fl.classList.add("go");
+  if (navigator.vibrate) navigator.vibrate(30);
+  const s = source();
+  lastPage = composePage(photoBits(s.src, s.w, s.h, s.mirror));
+  stillSource = null;
+  showSheet(lastPage);
+  runPrint(lastPage);
+}
+
+/* ---------- Bedienelemente ---------- */
+$("shutter").addEventListener("click", shoot);
+$("again").addEventListener("click", () => { if (lastPage) { showSheet(lastPage); runPrint(lastPage); } });
+$("done").addEventListener("click", hideSheet);
+$("flip").addEventListener("click", () => { facing = facing === "user" ? "environment" : "user"; startCamera(); });
+$("pick").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => { stillSource = img; hint("Foto geladen. Drück den Auslöser zum Drucken."); URL.revokeObjectURL(img.src); };
+  img.onerror = () => hint("Dieses Bild kann der Browser nicht öffnen. Wähle ein JPEG oder PNG.");
+  img.src = URL.createObjectURL(f); e.target.value = "";
+});
+$("status").addEventListener("click", async () => {
+  if (busy) return;
+  try { await ensurePrinter(); hint(""); updateStatus(); }
+  catch (e) { updateStatus(); const m = friendly(e); if (m) hint(m); }
+});
+$("gear").addEventListener("click", () => { fillSettings(); $("settings").showModal(); });
+$("forget").addEventListener("click", () => {
+  if (printer.device && printer.device.gatt.connected) printer.device.gatt.disconnect();
+  printer.device = null; printer.ae01 = null; printer.battery = null;
+  $("settings").close(); updateStatus();
+});
+const F = { format: "s-format", dither: "s-dither", bright: "s-bright", dark: "s-dark", frame: "s-frame", caption: "s-caption", rotate: "s-rotate" };
+function fillSettings() {
+  for (const [k, id] of Object.entries(F)) { const el = $(id); if (el.type === "checkbox") el.checked = S[k]; else el.value = S[k]; }
+  labels();
+}
+function labels() { $("v-bright").textContent = S.bright + " %"; $("v-dark").textContent = S.dark + " %"; }
+for (const [k, id] of Object.entries(F)) $(id).addEventListener("input", e => {
+  const el = e.target;
+  S[k] = el.type === "checkbox" ? el.checked : el.type === "range" ? +el.value : el.value;
+  save(); labels();
+});
+
+async function keepAwake() { try { await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
+
+window.Sofortbild = { printer, crc8, mxw, old, packPage, composePage, dither };
+updateStatus(); keepAwake(); startCamera(); requestAnimationFrame(loop);
+if (!canBluetooth()) hint(NO_BT);
+</script>
+</body>
+</html>
