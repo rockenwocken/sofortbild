@@ -107,6 +107,9 @@ input[type=range] { width: 100%; accent-color: var(--body); height: 32px; }
 .check { display: flex; gap: 10px; align-items: flex-start; }
 .check input { width: 22px; height: 22px; flex: none; margin: 1px 0 0; accent-color: var(--body); }
 .val { float: right; font: 400 13px var(--mono); }
+details summary { font-weight: 500; cursor: pointer; min-height: 32px; }
+#diag { margin: 8px 0; max-height: 30dvh; overflow: auto; padding: 8px; background: #fff; border: 1.5px solid var(--ink); border-radius: 6px; font: 11px/1.45 var(--mono); white-space: pre-wrap; word-break: break-all; user-select: text; }
+#copydiag { min-height: 40px; padding: 6px 14px; border: 1.5px solid var(--ink); border-radius: 6px; background: none; color: var(--ink); }
 .acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .acts button { flex: 1 1 auto; min-height: 46px; border: 1.5px solid var(--ink); border-radius: 6px; background: none; color: var(--ink); padding: 8px 12px; }
 .acts .main { background: var(--body); border-color: var(--body); color: var(--paper); }
@@ -188,6 +191,11 @@ input[type=range] { width: 100%; accent-color: var(--body); height: 32px; }
       <input id="s-caption" type="text" maxlength="28" placeholder="zum Beispiel Omas 80. Geburtstag" autocomplete="off">
     </div>
     <label class="check"><input id="s-rotate" type="checkbox"><span>Druck um 180° drehen<small>Einschalten, falls das Foto auf dem Kopf aus dem Drucker kommt.</small></span></label>
+    <details>
+      <summary>Diagnose für die Fehlersuche</summary>
+      <pre id="diag"></pre>
+      <button id="copydiag" type="button">Diagnose kopieren</button>
+    </details>
     <div class="acts">
       <button id="forget" type="button">Anderen Drucker wählen</button>
       <button class="main" type="submit">Fertig</button>
@@ -317,7 +325,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const PAPER_ERRORS = { 1: "Kein Papier im Drucker. Lege eine Rolle ein.", 9: "Kein Papier im Drucker. Lege eine Rolle ein.", 4: "Der Drucker ist zu heiß. Lass ihn kurz abkühlen.", 8: "Der Drucker-Akku ist fast leer. Lade ihn auf." };
 
 class Printer {
-  constructor() { this.device = null; this.protocol = null; this.battery = null; this.waiters = []; this.paused = false; this.onchange = () => {}; }
+  constructor() { this.device = null; this.protocol = null; this.battery = null; this.waiters = []; this.paused = false; this.diag = []; this.listening = null; this.onchange = () => {}; }
   get connected() { return !!(this.device && this.device.gatt.connected && this.ae01); }
   async pick() {
     const names = ["MX", "GB", "GT", "YT", "X", "Fun", "MTP", "Printer", "Mini", "C"];
@@ -335,14 +343,29 @@ class Printer {
     this.ae01 = await service.getCharacteristic(0xae01);
     this.ae02 = await service.getCharacteristic(0xae02);
     this.ae03 = await service.getCharacteristic(0xae03).catch(() => null);
-    /* MXW01 nimmt Bilddaten auf AE03 an, ältere Modelle auf AE01 */
-    this.protocol = this.ae03 && (this.ae03.properties.writeWithoutResponse || this.ae03.properties.write) ? "mxw01" : "classic";
+    const props = c => c ? Object.entries({ w: "write", n: "writeWithoutResponse", N: "notify", i: "indicate", r: "read" }).filter(([, p]) => c.properties[p]).map(([k]) => k).join("") : "-";
+    this.log(`Gerät ${this.device.name || "?"} · Dienst ${String(service.uuid || "").slice(4, 8)} · AE01 ${props(this.ae01)} AE02 ${props(this.ae02)} AE03 ${props(this.ae03)}`);
     await this.ae02.startNotifications();
-    this.ae02.addEventListener("characteristicvaluechanged", e => this.notified(new Uint8Array(e.target.value.buffer)));
-    if (this.protocol === "mxw01") await this.status().catch(() => {});
+    this.handler = this.handler || (e => { const v = e.target.value; this.notified(new Uint8Array(v.buffer, v.byteOffset, v.byteLength)); });
+    if (this.listening) this.listening.removeEventListener("characteristicvaluechanged", this.handler);
+    this.ae02.addEventListener("characteristicvaluechanged", this.handler);
+    this.listening = this.ae02;
+    /* Welches Protokoll? Ein MXW01 beantwortet die Statusabfrage, ältere Modelle schweigen. */
+    this.protocol = "mxw01";
+    try { await this.status(2500); }
+    catch (e) {
+      if (/Papier|heiß|Akku|Fehler/.test(e.message)) { this.onchange(); return; }
+      this.protocol = this.ae03 && /MXW/i.test(this.device.name || "") ? "mxw01" : "classic";
+    }
+    this.log(`Protokoll: ${this.protocol}`);
     this.onchange();
   }
+  log(line) {
+    this.diag.push(new Date().toLocaleTimeString("de-DE") + "  " + line);
+    if (this.diag.length > 60) this.diag.shift();
+  }
   notified(b) {
+    this.log("← " + [...b.slice(0, 24)].map(x => x.toString(16).padStart(2, "0")).join(" "));
     if (b[0] === 0x51 && b[1] === 0x78 && b[2] === 0xae) { this.paused = b[6] === 0x10; return; }
     if (b[0] !== 0x22 || b[1] !== 0x21) return;
     const n = b[4] | (b[5] << 8), msg = { cmd: b[2], payload: b.slice(6, 6 + n) };
@@ -354,9 +377,12 @@ class Printer {
       this.waiters.push(w);
     });
   }
-  send(ch, bytes) { return ch.properties.writeWithoutResponse ? ch.writeValueWithoutResponse(bytes) : ch.writeValue(bytes); }
-  async status() {
-    const wait = this.waitFor(0xa1, 3000, "Der Drucker antwortet nicht auf die Statusabfrage.");
+  send(ch, bytes) {
+    if (bytes.length < 40) this.log("→ " + (ch === this.ae03 ? "AE03 " : "") + [...bytes].map(x => x.toString(16).padStart(2, "0")).join(" "));
+    return ch.properties.writeWithoutResponse ? ch.writeValueWithoutResponse(bytes) : ch.writeValue(bytes);
+  }
+  async status(ms = 3000) {
+    const wait = this.waitFor(0xa1, ms, "Der Drucker antwortet nicht auf die Statusabfrage.");
     await this.send(this.ae01, mxw(0xa1, [0]));
     const { payload: p } = await wait;
     if (p.length >= 13) {
@@ -509,7 +535,8 @@ async function runPrint(page) {
   } catch (e) {
     busy = false; updateStatus();
     const msg = friendly(e);
-    if (msg) { hint(msg); $("sheetbar").hidden = true; $("tray").classList.remove("out"); }
+    printer.log("Fehler: " + (e && (e.name + " " + e.message)));
+    if (msg) { hint(msg + " Unter Einstellungen → Diagnose steht, was genau passiert ist."); $("sheetbar").hidden = true; $("tray").classList.remove("out"); }
     else updateStatus();
   } finally {
     $("shutter").disabled = false; $("again").disabled = false;
@@ -544,7 +571,13 @@ $("status").addEventListener("click", async () => {
   try { await ensurePrinter(); hint(""); updateStatus(); }
   catch (e) { updateStatus(); const m = friendly(e); if (m) hint(m); }
 });
-$("gear").addEventListener("click", () => { fillSettings(); $("settings").showModal(); });
+const diagText = () => [`Sofortbild ${navigator.userAgent}`, ...printer.diag].join("\n") || "Noch keine Daten. Verbinde den Drucker und drück einmal den Auslöser.";
+$("gear").addEventListener("click", () => { fillSettings(); $("diag").textContent = diagText(); $("settings").showModal(); });
+$("copydiag").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(diagText()); $("copydiag").textContent = "Kopiert"; }
+  catch (e) { const r = document.createRange(); r.selectNodeContents($("diag")); getSelection().removeAllRanges(); getSelection().addRange(r); $("copydiag").textContent = "Markiert, jetzt kopieren"; }
+  setTimeout(() => { $("copydiag").textContent = "Diagnose kopieren"; }, 2500);
+});
 $("forget").addEventListener("click", () => {
   if (printer.device && printer.device.gatt.connected) printer.device.gatt.disconnect();
   printer.device = null; printer.ae01 = null; printer.battery = null;
