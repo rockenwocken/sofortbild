@@ -180,6 +180,17 @@ details summary { font-weight: 600; cursor: pointer; min-height: 30px; }
       <input id="s-feed" type="range" min="0" max="30" step="1">
       <small>Leeres Papier nach dem Text, damit beim Abreißen nichts abgeschnitten wird.</small>
     </div>
+    <div class="field">
+      <label for="s-sharp">Nachschärfen <span class="val" id="v-sharp"></span></label>
+      <input id="s-sharp" type="range" min="0" max="100" step="10">
+      <small>Macht Kanten kräftiger, damit Details im Punktmuster erhalten bleiben.</small>
+    </div>
+    <div class="field">
+      <label for="s-torchBright">Helligkeit mit Licht <span class="val" id="v-torchBright"></span></label>
+      <input id="s-torchBright" type="range" min="50" max="110" step="5">
+      <small>Bei eingeschalteter Lampe wird das Bild so viel dunkler und kontrastreicher.</small>
+    </div>
+    <label class="check"><input id="s-sound" type="checkbox"><span>Auslösegeräusch<small>Spielt über die Medienlautstärke.</small></span></label>
     <label class="check"><input id="s-rotate" type="checkbox"><span>Druck um 180° drehen<small>Einschalten, falls das Foto auf dem Kopf aus dem Drucker kommt.</small></span></label>
     <hr>
     <details>
@@ -198,7 +209,7 @@ details summary { font-weight: 600; cursor: pointer; min-height: 30px; }
 <script>
 "use strict";
 /* ---------- Einstellungen ---------- */
-const DEFAULTS = { format: "screen", dither: "atkinson", bright: 110, dark: 80, frame: true, date: true, caption: "", rotate: false, compare: false, feed: 5 };
+const DEFAULTS = { format: "screen", dither: "atkinson", bright: 110, dark: 80, frame: true, date: true, caption: "", rotate: false, compare: false, feed: 5, sound: true, sharp: 50, torchBright: 80 };
 const S = { ...DEFAULTS };
 try { Object.assign(S, JSON.parse(localStorage.getItem("sofortbild") || "{}")); } catch (e) {}
 if (!S.v2) { S.format = "screen"; S.feed = DEFAULTS.feed; S.v2 = 1; }
@@ -232,10 +243,10 @@ function grayCover(src, sw, sh, w, h, mirror) {
   return g;
 }
 /* Kontrast automatisch strecken: Thermopapier kennt nur Schwarz und Weiß */
-function tone(g, bright) {
+function tone(g, bright, clip = .01) {
   const hist = new Uint32Array(256);
-  for (const v of g) hist[v | 0]++;
-  const cut = g.length * .01; let lo = 0, hi = 255, sum = 0;
+  for (const v of g) hist[Math.min(255, Math.max(0, v | 0))]++;
+  const cut = g.length * clip; let lo = 0, hi = 255, sum = 0;
   while (lo < 255 && (sum += hist[lo]) < cut) lo++;
   sum = 0; while (hi > 0 && (sum += hist[hi]) < cut) hi--;
   const span = Math.max(30, hi - lo), gamma = 1 / bright;
@@ -243,6 +254,20 @@ function tone(g, bright) {
     const n = Math.min(1, Math.max(0, (g[i] - lo) / span));
     g[i] = 255 * Math.pow(n, gamma);
   }
+}
+/* Unscharfe Maske: Kanten kräftiger machen, damit Details das Punktmuster überstehen */
+function sharpen(g, w, h, amount) {
+  if (amount <= 0) return;
+  const tmp = new Float32Array(g.length), blur = new Float32Array(g.length);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, l = x ? i - 1 : i, r = x < w - 1 ? i + 1 : i;
+    tmp[i] = (g[l] + g[i] + g[r]) / 3;
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, u = y ? i - w : i, d = y < h - 1 ? i + w : i;
+    blur[i] = (tmp[u] + tmp[i] + tmp[d]) / 3;
+  }
+  for (let i = 0; i < g.length; i++) g[i] = Math.min(255, Math.max(0, g[i] + (g[i] - blur[i]) * amount));
 }
 const BAYER = [0, 48, 12, 60, 3, 51, 15, 63, 32, 16, 44, 28, 35, 19, 47, 31, 8, 56, 4, 52, 11, 59, 7, 55, 40, 24, 36, 20, 43, 27, 39, 23, 2, 50, 14, 62, 1, 49, 13, 61, 34, 18, 46, 30, 33, 17, 45, 29, 10, 58, 6, 54, 9, 57, 5, 53, 42, 26, 38, 22, 41, 25, 37, 21];
 /* Ergebnis: 1 = schwarzer Punkt */
@@ -278,7 +303,10 @@ function paintBits(ctx, bits, w, h, x = 0, y = 0) {
 function photoBits(src, sw, sh, mirror, kind = S.dither) {
   const { w, h } = photoSize();
   const g = grayCover(src, sw, sh, w, h, mirror);
-  tone(g, S.bright / 100);
+  /* Mit Lampe ist der Vordergrund überbelichtet: dunkler und härter abstimmen */
+  const lit = typeof torchOn !== "undefined" && torchOn;
+  tone(g, (S.bright / 100) * (lit ? S.torchBright / 100 : 1), lit ? .03 : .01);
+  sharpen(g, w, h, S.sharp / 50);
   return { bits: dither(g, w, h, kind), w, h };
 }
 const DITHER_NAMES = { atkinson: "Atkinson", floyd: "Floyd-Steinberg", bayer: "Raster (Bayer 8x8)" };
@@ -481,12 +509,37 @@ function setupTorch() {
   const t = track();
   printer.log(`Kamera: ${t ? t.label : "-"} · Lampe ${hasTorch(t) ? "ja" : "nein"}`);
 }
+/* Kamera für Schwarzweiß einstellen. Jede Einstellung einzeln, weil Handys nur einen Teil unterstützen. */
+async function tuneCamera(lit) {
+  await sleep(400);
+  const t = track(); if (!t || !t.getCapabilities) return;
+  const c = t.getCapabilities(), done = [];
+  const mid = (r, f) => r.min + (r.max - r.min) * f;
+  const wanted = {
+    zoom: c.zoom && c.zoom.min,                                   /* größter Bildwinkel der Hauptkamera */
+    focusMode: c.focusMode && c.focusMode.includes("continuous") && "continuous",
+    exposureMode: c.exposureMode && c.exposureMode.includes("continuous") && "continuous",
+    whiteBalanceMode: c.whiteBalanceMode && c.whiteBalanceMode.includes("continuous") && "continuous",
+    exposureCompensation: c.exposureCompensation && Math.max(c.exposureCompensation.min, lit ? -1.3 : -0.3),
+    sharpness: c.sharpness && c.sharpness.max,
+    contrast: c.contrast && mid(c.contrast, .8),
+    saturation: c.saturation && c.saturation.min
+  };
+  for (const [k, v] of Object.entries(wanted)) {
+    if (v === undefined || v === false || v === null) continue;
+    try { await t.applyConstraints({ advanced: [{ [k]: v }] }); done.push(`${k}=${typeof v === "number" ? +v.toFixed(2) : v}`); }
+    catch (e) { done.push(`${k} abgelehnt`); }
+  }
+  const st = t.getSettings();
+  printer.log(`Kamera ${st.width}×${st.height} · ${done.join(", ") || "keine Einstellungen verfügbar"}`);
+}
 async function setTorch(on) {
   const t = track();
   if (window.ImageCapture) { try { await new ImageCapture(t).getPhotoCapabilities(); } catch (e) {} }
   try { await t.applyConstraints({ advanced: [{ torch: on }] }); }
   catch (e) { await t.applyConstraints({ torch: on }); }
   torchOn = on; $("torch").setAttribute("aria-pressed", String(on));
+  tuneCamera(on);
 }
 async function findTorchCamera() {
   const all = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
@@ -533,14 +586,26 @@ async function startCamera() {
   try {
     if (!navigator.mediaDevices) throw new Error("no media");
     let saved = null; try { saved = localStorage.getItem("sofortbild-cam"); } catch (e) {}
-    const size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+    /* 4:3 ist das volle Sensorformat, 16:9 würde oben und unten abschneiden */
+    const size = { width: { ideal: 1920 }, height: { ideal: 1440 }, aspectRatio: { ideal: 4 / 3 } };
     if (facing === "environment" && saved) {
       try { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { deviceId: { exact: saved }, ...size } }); } catch (e) { stream = null; }
     }
     if (!stream) stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing }, ...size } });
+    /* Hauptkamera wählen: unter Android heißt sie "camera2 0, facing back" und hat als einzige die Lampe */
+    if (facing === "environment" && !saved) {
+      const main = (await navigator.mediaDevices.enumerateDevices()).find(d => d.kind === "videoinput" && /camera2 0\b/.test(d.label));
+      const cur = stream.getVideoTracks()[0];
+      if (main && cur.getSettings().deviceId !== main.deviceId) {
+        cur.stop();
+        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { deviceId: { exact: main.deviceId }, ...size } });
+      }
+      if (main) try { localStorage.setItem("sofortbild-cam", main.deviceId); } catch (e) {}
+    }
     video.srcObject = stream; await video.play();
     hint(""); stillSource = null;
     setupTorch();
+    tuneCamera(false);
   } catch (e) {
     sample = sample || makeSample();
     hint("Die Kamera ist nicht freigegeben. Erlaube sie in Chrome oder wähle unten rechts ein Foto aus der Galerie. Bis dahin siehst du ein Beispielbild.");
@@ -620,9 +685,29 @@ async function runPrint(page) {
     $("shutter").disabled = false; $("again").disabled = false;
   }
 }
+/* Auslösegeräusch: zwei kurze gefilterte Rauschstöße wie ein Schlitzverschluss */
+let actx = null;
+function shutterSound() {
+  if (!S.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    const t = actx.currentTime;
+    const burst = (at, dur, freq, gain) => {
+      const n = Math.round(actx.sampleRate * dur), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 4);
+      const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+      src.buffer = buf; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = .9; g.gain.value = gain;
+      src.connect(f).connect(g).connect(actx.destination); src.start(t + at);
+    };
+    burst(0, .045, 3200, 1.6); burst(.012, .03, 900, 1.2);
+    burst(.085, .06, 2200, 1.3); burst(.095, .05, 600, 1);
+  } catch (e) {}
+}
 function shoot() {
   if (busy) return;
   const fl = $("flash"); fl.classList.remove("go"); void fl.offsetWidth; fl.classList.add("go");
+  shutterSound();
   if (navigator.vibrate) navigator.vibrate(30);
   const s = source();
   if (S.compare) {
@@ -693,12 +778,12 @@ $("forget").addEventListener("click", () => {
   printer.device = null; printer.ae01 = null; printer.battery = null;
   updateStatus();
 });
-const F = { format: "s-format", dither: "s-dither", bright: "s-bright", dark: "s-dark", frame: "s-frame", caption: "s-caption", rotate: "s-rotate", compare: "s-compare", date: "s-date", feed: "s-feed" };
+const F = { format: "s-format", dither: "s-dither", bright: "s-bright", dark: "s-dark", frame: "s-frame", caption: "s-caption", rotate: "s-rotate", compare: "s-compare", date: "s-date", feed: "s-feed", sound: "s-sound", sharp: "s-sharp", torchBright: "s-torchBright" };
 function fillSettings() {
   for (const [k, id] of Object.entries(F)) { const el = $(id); if (el.type === "checkbox") el.checked = S[k]; else el.value = S[k]; }
   labels();
 }
-function labels() { $("v-bright").textContent = S.bright + " %"; $("v-dark").textContent = S.dark + " %"; $("v-feed").textContent = "+" + S.feed + " mm"; }
+function labels() { $("v-bright").textContent = S.bright + " %"; $("v-dark").textContent = S.dark + " %"; $("v-feed").textContent = "+" + S.feed + " mm"; $("v-sharp").textContent = S.sharp + " %"; $("v-torchBright").textContent = S.torchBright + " %"; }
 for (const [k, id] of Object.entries(F)) $(id).addEventListener("input", e => {
   const el = e.target;
   S[k] = el.type === "checkbox" ? el.checked : el.type === "range" ? +el.value : el.value;
