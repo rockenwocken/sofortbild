@@ -209,10 +209,11 @@ details summary { font-weight: 600; cursor: pointer; min-height: 30px; }
 <script>
 "use strict";
 /* ---------- Einstellungen ---------- */
-const DEFAULTS = { format: "screen", dither: "atkinson", bright: 110, dark: 80, frame: true, date: true, caption: "", rotate: false, compare: false, feed: 5, sound: true, sharp: 50, torchBright: 80 };
+const DEFAULTS = { format: "screen", dither: "atkinson", bright: 110, dark: 95, frame: true, date: true, caption: "", rotate: false, compare: false, feed: 5, sound: true, sharp: 50, torchBright: 80 };
 const S = { ...DEFAULTS };
 try { Object.assign(S, JSON.parse(localStorage.getItem("sofortbild") || "{}")); } catch (e) {}
 if (!S.v2) { S.format = "screen"; S.feed = DEFAULTS.feed; S.v2 = 1; }
+if (!S.v3) { S.dark = 95; S.v3 = 1; }
 const save = () => { try { localStorage.setItem("sofortbild", JSON.stringify(S)); } catch (e) {} };
 
 /* ---------- Bildverarbeitung ---------- */
@@ -358,49 +359,42 @@ function crc8(bytes) {
   for (const b of bytes) { crc ^= b; for (let i = 0; i < 8; i++) crc = crc & 0x80 ? ((crc << 1) ^ 7) & 255 : (crc << 1) & 255; }
   return crc;
 }
-const frame = (a, b, cmd, payload) => {
+/* Befehlsrahmen des MX06: 51 78 Befehl 00 Länge 00 Daten CRC FF */
+const cmd = (c, payload) => {
   const n = payload.length;
-  return Uint8Array.from([a, b, cmd, 0, n & 255, n >> 8, ...payload, crc8(payload), 0xff]);
+  return Uint8Array.from([0x51, 0x78, c, 0, n & 255, n >> 8, ...payload, crc8(payload), 0xff]);
 };
-const mxw = (cmd, payload) => frame(0x22, 0x21, cmd, payload);
-const old = (cmd, payload) => frame(0x51, 0x78, cmd, payload);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const PAPER_ERRORS = { 1: "Kein Papier im Drucker. Lege eine Rolle ein.", 9: "Kein Papier im Drucker. Lege eine Rolle ein.", 4: "Der Drucker ist zu heiß. Lass ihn kurz abkühlen.", 8: "Der Drucker-Akku ist fast leer. Lade ihn auf." };
+/* Zustandsbits aus der Antwort auf 0xA3 (laut fulda1/Thermal_Printer-Wiki) */
+const STATE_ERRORS = [
+  [0x01, "Kein Papier erkannt oder die Papierklappe ist offen. Leg eine Rolle ein und schließ die Klappe."],
+  [0x02, "Der Deckel des Druckers ist offen. Schließ ihn und versuch es nochmal."],
+  [0x04, "Der Druckkopf ist zu heiß. Mach eine kurze Pause und versuch es dann nochmal."],
+  [0x08, "Der Akku des Druckers ist fast leer. Lade ihn auf."]
+];
 
 class Printer {
-  constructor() { this.device = null; this.protocol = null; this.battery = null; this.waiters = []; this.paused = false; this.diag = []; this.listening = null; this.onchange = () => {}; }
+  constructor() { this.device = null; this.waiters = []; this.paused = false; this.diag = []; this.listening = null; this.state = null; this.onchange = () => {}; }
   get connected() { return !!(this.device && this.device.gatt.connected && this.ae01); }
   async pick() {
-    const names = ["MX", "GB", "GT", "YT", "X", "Fun", "MTP", "Printer", "Mini", "C"];
     this.device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [0xae30] }, { services: [0xaf30] }, ...names.map(namePrefix => ({ namePrefix }))],
-      optionalServices: [0xae30, 0xaf30]
+      filters: [{ namePrefix: "MX" }, { services: [0xae30] }],
+      optionalServices: [0xae30]
     });
     this.device.addEventListener("gattserverdisconnected", () => { this.ae01 = null; this.onchange(); });
   }
   async connect() {
     const server = await this.device.gatt.connect();
-    let service;
-    try { service = await server.getPrimaryService(0xae30); }
-    catch (e) { service = await server.getPrimaryService(0xaf30); }
+    const service = await server.getPrimaryService(0xae30);
     this.ae01 = await service.getCharacteristic(0xae01);
     this.ae02 = await service.getCharacteristic(0xae02);
-    this.ae03 = await service.getCharacteristic(0xae03).catch(() => null);
-    const props = c => c ? Object.entries({ w: "write", n: "writeWithoutResponse", N: "notify", i: "indicate", r: "read" }).filter(([, p]) => c.properties[p]).map(([k]) => k).join("") : "-";
-    this.log(`Gerät ${this.device.name || "?"} · Dienst ${String(service.uuid || "").slice(4, 8)} · AE01 ${props(this.ae01)} AE02 ${props(this.ae02)} AE03 ${props(this.ae03)}`);
+    this.log(`Gerät ${this.device.name || "?"} verbunden`);
     await this.ae02.startNotifications();
     this.handler = this.handler || (e => { const v = e.target.value; this.notified(new Uint8Array(v.buffer, v.byteOffset, v.byteLength)); });
     if (this.listening) this.listening.removeEventListener("characteristicvaluechanged", this.handler);
     this.ae02.addEventListener("characteristicvaluechanged", this.handler);
     this.listening = this.ae02;
-    /* Welches Protokoll? Ein MXW01 beantwortet die Statusabfrage, ältere Modelle schweigen. */
-    this.protocol = "mxw01";
-    try { await this.status(2500); }
-    catch (e) {
-      if (/Papier|heiß|Akku|Fehler/.test(e.message)) { this.onchange(); return; }
-      this.protocol = this.ae03 && /MXW/i.test(this.device.name || "") ? "mxw01" : "classic";
-    }
-    this.log(`Protokoll: ${this.protocol}`);
+    await this.checkState().catch(e => this.log("Zustand: " + e.message));
     this.onchange();
   }
   log(line) {
@@ -409,68 +403,54 @@ class Printer {
   }
   notified(b) {
     this.log("← " + [...b.slice(0, 24)].map(x => x.toString(16).padStart(2, "0")).join(" "));
-    if (b[0] === 0x51 && b[1] === 0x78 && b[2] === 0xae) { this.paused = b[6] === 0x10; return; }
-    if (b[0] !== 0x22 || b[1] !== 0x21) return;
+    if (b[0] !== 0x51 || b[1] !== 0x78) return;
     const n = b[4] | (b[5] << 8), msg = { cmd: b[2], payload: b.slice(6, 6 + n) };
+    if (msg.cmd === 0xae) { this.paused = msg.payload[0] === 0x10; return; }
     this.waiters = this.waiters.filter(w => { if (w.cmd !== msg.cmd) return true; clearTimeout(w.t); w.ok(msg); return false; });
   }
-  waitFor(cmd, ms, what) {
-    return new Promise((ok, no) => {
-      const w = { cmd, ok, t: setTimeout(() => { this.waiters = this.waiters.filter(x => x !== w); no(new Error(what)); }, ms) };
+  waitFor(c, ms) {
+    return new Promise(ok => {
+      const w = { cmd: c, ok, t: setTimeout(() => { this.waiters = this.waiters.filter(x => x !== w); ok(null); }, ms) };
       this.waiters.push(w);
     });
   }
-  send(ch, bytes) {
-    if (bytes.length < 40) this.log("→ " + (ch === this.ae03 ? "AE03 " : "") + [...bytes].map(x => x.toString(16).padStart(2, "0")).join(" "));
-    return ch.properties.writeWithoutResponse ? ch.writeValueWithoutResponse(bytes) : ch.writeValue(bytes);
+  send(bytes) {
+    if (bytes.length < 40) this.log("→ " + [...bytes].map(x => x.toString(16).padStart(2, "0")).join(" "));
+    return this.ae01.properties.writeWithoutResponse ? this.ae01.writeValueWithoutResponse(bytes) : this.ae01.writeValue(bytes);
   }
-  async status(ms = 3000) {
-    const wait = this.waitFor(0xa1, ms, "Der Drucker antwortet nicht auf die Statusabfrage.");
-    await this.send(this.ae01, mxw(0xa1, [0]));
-    const { payload: p } = await wait;
-    if (p.length >= 13) {
-      this.battery = p[9];
-      if (p[12] !== 0 && p.length > 13) throw new Error(PAPER_ERRORS[p[13]] || `Der Drucker meldet Fehler ${p[13]}.`);
-    }
+  /* Zustand abfragen; wirft einen Fehler bei Papiermangel, Überhitzung usw. */
+  async checkState() {
+    const reply = this.waitFor(0xa3, 2000);
+    await this.send(cmd(0xa3, [0]));
+    const msg = await reply;
+    if (!msg) { this.log("Zustand: keine Antwort"); return; }
+    this.state = msg.payload[0];
+    for (const [bit, text] of STATE_ERRORS) if (this.state & bit) throw new Error(text);
   }
-  async stream(ch, bytes, size, gap, onprogress) {
+  async stream(bytes, size, gap, onprogress) {
     for (let i = 0; i < bytes.length; i += size) {
       while (this.paused) await sleep(20);
-      await this.send(ch, bytes.subarray(i, i + size));
+      await this.send(bytes.subarray(i, i + size));
       await sleep(gap);
       onprogress && onprogress(Math.min(1, (i + size) / bytes.length));
     }
   }
-  async printMxw({ data, lines }, darkness, onprogress) {
-    await this.status().catch(e => { if (PAPER_ERRORS[e.message] || /Papier|heiß|Akku|Fehler/.test(e.message)) throw e; });
-    await this.send(this.ae01, mxw(0xa2, [Math.round(darkness * 255)]));
-    const accepted = this.waitFor(0xa9, 3000, "Der Drucker hat den Druckauftrag nicht bestätigt.");
-    await this.send(this.ae01, mxw(0xa9, [lines & 255, lines >> 8, 0x30, 0x00]));
-    const { payload } = await accepted;
-    if (payload[0] === 1) throw new Error("Der Drucker hat den Auftrag abgelehnt. Prüfe Papier und Akku.");
-    const finished = this.waitFor(0xaa, 120000, "Der Drucker hat das Ende des Drucks nicht gemeldet.");
-    finished.catch(() => {});
-    await this.stream(this.ae03, data, 100, 12, onprogress);
-    await this.send(this.ae01, mxw(0xad, [0]));
-    await finished;
-  }
-  async printClassic({ data, rowBytes, lines }, darkness, onprogress) {
-    /* Ablauf wie im Projekt NaitLee/Cat-Printer (MX05, MX06, GB01 …):
-       Status, Druckstart, 200 dpi, Tempo, Energie, Energie übernehmen, Gerät aktualisieren, dann die Zeilen */
+  /* Ablauf wie im Projekt NaitLee/Cat-Printer: Druckstart, 200 dpi, Tempo, Energie, übernehmen, Gerät aktualisieren, Zeilen */
+  async print({ data, rowBytes, lines }, darkness, onprogress) {
+    await this.checkState();
     const energy = Math.round(darkness * 0xffff), parts = [
-      old(0xa3, [0]), old(0xa3, [0]), old(0xa4, [50]), old(0xbd, [32]),
-      old(0xaf, [energy & 255, energy >> 8]), old(0xbe, [1]), old(0xa9, [0]),
-      old(0xa6, [0xaa, 0x55, 0x17, 0x38, 0x44, 0x5f, 0x5f, 0x5f, 0x44, 0x38, 0x2c])
+      cmd(0xa3, [0]), cmd(0xa4, [50]), cmd(0xbd, [32]),
+      cmd(0xaf, [energy & 255, energy >> 8]), cmd(0xbe, [1]), cmd(0xa9, [0]),
+      cmd(0xa6, [0xaa, 0x55, 0x17, 0x38, 0x44, 0x5f, 0x5f, 0x5f, 0x44, 0x38, 0x2c])
     ];
-    this.log(`Klassischer Druck: ${lines} Zeilen, Energie ${energy.toString(16)}`);
-    for (let y = 0; y < lines; y++) parts.push(old(0xa2, [...data.subarray(y * rowBytes, (y + 1) * rowBytes)]));
-    parts.push(old(0xa6, [0xaa, 0x55, 0x17, 0, 0, 0, 0, 0, 0, 0, 0x17]), old(0xbd, [8]), old(0xa3, [0]));
+    this.log(`Druck: ${lines} Zeilen, Energie ${energy.toString(16)}`);
+    for (let y = 0; y < lines; y++) parts.push(cmd(0xa2, [...data.subarray(y * rowBytes, (y + 1) * rowBytes)]));
+    parts.push(cmd(0xa6, [0xaa, 0x55, 0x17, 0, 0, 0, 0, 0, 0, 0, 0x17]), cmd(0xbd, [8]));
     const total = parts.reduce((n, p) => n + p.length, 0), all = new Uint8Array(total);
     let at = 0; for (const p of parts) { all.set(p, at); at += p.length; }
-    await this.stream(this.ae01, all, 100, 20, onprogress);
-  }
-  print(packed, darkness, onprogress) {
-    return this.protocol === "mxw01" ? this.printMxw(packed, darkness, onprogress) : this.printClassic(packed, darkness, onprogress);
+    await this.stream(all, 100, 20, onprogress);
+    /* Nach dem Druck nochmal fragen, damit Überhitzung sofort gemeldet wird */
+    await this.checkState();
   }
 }
 
@@ -486,7 +466,7 @@ function hint(text) { $("hint").textContent = text || ""; $("hintbox").hidden = 
 function updateStatus(text) {
   $("status").classList.toggle("on", printer.connected);
   $("statustext").textContent = printer.connected
-    ? (printer.battery != null ? `${printer.device.name || "Drucker"} verbunden · Akku ${printer.battery} %` : `${printer.device.name || "Drucker"} verbunden`)
+    ? `${printer.device.name || "Drucker"} verbunden`
     : (printer.device ? `${printer.device.name || "Drucker"} getrennt` : "Kein Drucker verbunden");
   $("progress").hidden = !(busy && text);
   if (busy && text) $("progress").textContent = text;
@@ -779,7 +759,7 @@ $("copydiag").addEventListener("click", async () => {
 });
 $("forget").addEventListener("click", () => {
   if (printer.device && printer.device.gatt.connected) printer.device.gatt.disconnect();
-  printer.device = null; printer.ae01 = null; printer.battery = null;
+  printer.device = null; printer.ae01 = null;
   updateStatus();
 });
 const F = { format: "s-format", dither: "s-dither", bright: "s-bright", dark: "s-dark", frame: "s-frame", caption: "s-caption", rotate: "s-rotate", compare: "s-compare", date: "s-date", feed: "s-feed", sound: "s-sound", sharp: "s-sharp", torchBright: "s-torchBright" };
@@ -797,7 +777,7 @@ for (const [k, id] of Object.entries(F)) $(id).addEventListener("input", e => {
 async function keepAwake() { try { await navigator.wakeLock.request("screen"); } catch (e) {} }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
 
-window.Sofortbild = { printer, crc8, mxw, old, packPage, composePage, dither };
+window.Sofortbild = { printer, crc8, cmd, packPage, composePage, dither };
 updateStatus(); keepAwake(); startCamera(); requestAnimationFrame(loop);
 /* Schrift für den Drucktext vorab laden, sonst druckt Canvas mit Ersatzschrift */
 if (document.fonts) document.fonts.load(`700 30px ${FONT}`).catch(() => {});
