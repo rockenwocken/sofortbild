@@ -185,10 +185,17 @@ body:not([data-view="action"]) #action { display: none !important; }
 
 /* Ergebnis */
 #ajresult { overflow-y: auto; touch-action: pan-y; padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 16px; align-content: start; justify-items: center; }
-.aj-anim { width: min(100%, 270px); border-radius: 18px; overflow: hidden; position: relative; background: #000; box-shadow: 0 0 0 5px #111, 0 0 0 8px var(--aj-chrome); }
-.aj-anim canvas { width: 100%; height: auto; aspect-ratio: 3 / 4; display: block; filter: sepia(.38) saturate(1.45) contrast(1.12) hue-rotate(-8deg); }
+.aj-animrow { display: flex; gap: 14px; align-items: stretch; justify-content: center; width: min(100%, 360px); }
+.aj-anim { flex: 0 1 270px; min-width: 0; border-radius: 18px; overflow: hidden; position: relative; background: #000; box-shadow: 0 0 0 5px #111, 0 0 0 8px var(--aj-chrome); }
+.aj-anim canvas { width: 100%; height: auto; aspect-ratio: 3 / 4; display: block; }
+.aj-speed { flex: none; display: grid; grid-template-rows: auto 1fr auto auto; justify-items: center; gap: 6px; padding: 10px 6px; border-radius: 10px;
+  background: linear-gradient(#d6d3ca, #a9a59b); color: var(--aj-brown); font: 700 10px var(--aj-label); letter-spacing: .12em; box-shadow: inset 0 0 0 2px #111; }
+.aj-speed input { writing-mode: vertical-lr; direction: rtl; width: 34px; min-height: 120px; height: 100%; margin: 0; accent-color: var(--aj-orange); touch-action: none; }
+.aj-speed output { font: 700 14px var(--aj-label); letter-spacing: 0; background: #1c1712; color: var(--aj-mustard); padding: 2px 5px; border-radius: 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.aj-share { display: flex; gap: 12px; width: min(100%, 360px); margin-top: -4px; }
+.aj-btn.small { min-height: 44px; font-size: 14px; background: #4a3326; box-shadow: 0 3px 0 #000; }
 .aj-label { font: 700 12px var(--aj-label); letter-spacing: .2em; text-transform: uppercase; color: var(--aj-mustard); justify-self: start; width: min(100%, 360px); margin: 0 auto -8px; }
-.aj-sampler { width: min(100%, 360px); display: block; border: 8px solid #111; border-radius: 4px; box-shadow: 0 0 0 2px var(--aj-chrome); filter: sepia(.3) saturate(1.35) contrast(1.1) hue-rotate(-8deg); }
+.aj-sampler { width: min(100%, 360px); display: block; border: 8px solid #111; border-radius: 4px; box-shadow: 0 0 0 2px var(--aj-chrome); }
 .aj-actions { display: flex; gap: 12px; width: min(100%, 360px); }
 .aj-btn { flex: 1 1 0; min-height: 52px; border: 0; border-radius: 10px; font: 700 16px var(--aj-label); letter-spacing: .12em; text-transform: uppercase; color: var(--aj-cream); background: var(--aj-brown); box-shadow: 0 4px 0 #000; }
 .aj-btn.main { background: var(--aj-orange); color: var(--aj-cream); box-shadow: 0 4px 0 #7a3010; }
@@ -231,9 +238,26 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
     </div>
   </div>
   <div id="ajresult">
-    <div class="aj-anim"><canvas id="aj-anim" width="480" height="640"></canvas></div>
+    <div class="aj-label">Daumenkino</div>
+    <div class="aj-animrow">
+      <div class="aj-anim"><canvas id="aj-anim" width="480" height="640"></canvas></div>
+      <div class="aj-speed">
+        <span>SCHNELL</span>
+        <input id="aj-speed" type="range" min="1" max="12" step="1" aria-label="Geschwindigkeit der Animation in Bildern pro Sekunde">
+        <span>LANGSAM</span>
+        <output id="aj-fps">4 B/s</output>
+      </div>
+    </div>
+    <div class="aj-share">
+      <button class="aj-btn small" id="aj-save-gif" type="button">Speichern</button>
+      <button class="aj-btn small" id="aj-share-gif" type="button">Teilen</button>
+    </div>
     <div class="aj-label">Supersampler</div>
-    <canvas class="aj-sampler" id="aj-sampler" width="1200" height="800"></canvas>
+    <canvas class="aj-sampler" id="aj-sampler" width="1200" height="1608"></canvas>
+    <div class="aj-share">
+      <button class="aj-btn small" id="aj-save-png" type="button">Speichern</button>
+      <button class="aj-btn small" id="aj-share-png" type="button">Teilen</button>
+    </div>
     <div class="aj-actions">
       <button class="aj-btn" id="aj-again" type="button">Nochmal</button>
       <button class="aj-btn main" id="aj-print" type="button">Drucken</button>
@@ -1099,19 +1123,78 @@ function cover(ctx, img, x, y, w, h) {
   const s = Math.max(w / img.width, h / img.height), cw = w / s, ch = h / s;
   ctx.drawImage(img, (img.width - cw) / 2, (img.height - ch) / 2, cw, ch, x, y, w, h);
 }
+/* Filmlook fest ins Bild rechnen, damit Gespeichertes genauso aussieht wie am Bildschirm */
+const FILM = "sepia(.38) saturate(1.45) contrast(1.12) brightness(1.03) hue-rotate(-8deg)";
+let ajBaked = [];
+function bake(f, w, h) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d"); x.filter = FILM; cover(x, f, 0, 0, w, h);
+  return c;
+}
+if (!(S.ajFps >= 1 && S.ajFps <= 12)) S.ajFps = 4;
+function ajStartAnim() {
+  const an = $("aj-anim"), ax = an.getContext("2d"); let i = 0;
+  const draw = () => { if (ajBaked.length) ax.drawImage(ajBaked[i++ % 4], 0, 0, an.width, an.height); };
+  draw(); clearInterval(ajAnimTimer);
+  ajAnimTimer = setInterval(draw, 1000 / S.ajFps);
+  $("aj-speed").value = 13 - S.ajFps; $("aj-fps").textContent = S.ajFps + " B/s";
+}
+/* Regler oben = schnell */
+$("aj-speed").addEventListener("input", e => { S.ajFps = 13 - +e.target.value; save(); ajStartAnim(); });
 function ajShowResult() {
   ajMode("result");
-  /* Supersampler: vier schmale Panoramastreifen übereinander in einem 3:2-Bild */
-  const sm = $("aj-sampler"), sx = sm.getContext("2d"), H = sm.height, W = sm.width, line = 6, sh = (H - 3 * line) / 4;
+  ajBaked = ajFrames.map(f => bake(f, 480, 640));
+  /* Supersampler: vier Bilder im Raster 1 2 / 3 4 mit schmalem Filmsteg */
+  const sm = $("aj-sampler"), sx = sm.getContext("2d"), W = sm.width, H = sm.height, line = 12;
+  const cw = (W - line) / 2, ch = (H - line) / 2;
   sx.fillStyle = "#0b0907"; sx.fillRect(0, 0, W, H);
-  ajFrames.forEach((f, i) => cover(sx, f, 0, Math.round(i * (sh + line)), W, Math.round(sh)));
-  /* Animation: die vier Bilder laufen nacheinander wie ein Daumenkino */
-  const an = $("aj-anim"), ax = an.getContext("2d"); let i = 0;
-  const draw = () => { cover(ax, ajFrames[i % 4], 0, 0, an.width, an.height); i++; };
-  draw(); clearInterval(ajAnimTimer);
-  ajAnimTimer = setInterval(draw, Math.max(150, Math.min(600, S.ajInt * 1000)));
+  sx.filter = FILM;
+  ajFrames.forEach((f, i) => cover(sx, f, Math.round((i % 2) * (cw + line)), Math.round(Math.floor(i / 2) * (ch + line)), Math.round(cw), Math.round(ch)));
+  sx.filter = "none";
+  ajStartAnim();
   $("ajresult").scrollTop = 0;
 }
+const stampName = (t, ext) => { const p = n => String(n).padStart(2, "0"); return `action-jackson-${t.getFullYear()}${p(t.getMonth() + 1)}${p(t.getDate())}-${p(t.getHours())}${p(t.getMinutes())}${p(t.getSeconds())}${ext}`; };
+function downloadBlob(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+async function shareBlob(blob, name) {
+  const file = new File([blob], name, { type: blob.type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: "Action Jackson" }); } catch (e) { if (e.name !== "AbortError") hint("Teilen hat nicht geklappt. Speichere das Bild und teile es aus der Galerie."); }
+  } else { downloadBlob(blob, name); hint("Dein Browser kann hier nicht direkt teilen. Das Bild wurde stattdessen gespeichert."); }
+}
+/* Animiertes GIF mit der Bibliothek gifenc, Tempo wie eingestellt, Endlosschleife */
+let gifenc = null;
+async function ajGif() {
+  gifenc = gifenc || await import("./gifenc.js");
+  const { GIFEncoder, quantize, applyPalette } = gifenc, w = 360, h = 480, gif = GIFEncoder();
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  for (const f of ajBaked) {
+    x.drawImage(f, 0, 0, w, h);
+    const { data } = x.getImageData(0, 0, w, h), palette = quantize(data, 256), index = applyPalette(data, palette);
+    gif.writeFrame(index, w, h, { palette, delay: Math.round(1000 / S.ajFps) });
+  }
+  gif.finish();
+  return new Blob([gif.bytes()], { type: "image/gif" });
+}
+const ajPng = () => new Promise(ok => $("aj-sampler").toBlob(ok, "image/png"));
+async function ajOut(btn, make, ext, share) {
+  const label = btn.textContent; btn.disabled = true; btn.textContent = "…";
+  try {
+    const blob = await make(), name = stampName(ajTime || new Date(), ext);
+    if (share) await shareBlob(blob, name); else { downloadBlob(blob, name); btn.textContent = "Gespeichert"; await sleep(1500); }
+  } catch (e) { printer.log("Export: " + e.message); hint("Das hat nicht geklappt. Lade die Seite neu und versuch es nochmal."); }
+  btn.disabled = false; btn.textContent = label;
+}
+$("aj-save-gif").addEventListener("click", e => ajOut(e.currentTarget, ajGif, ".gif", false));
+$("aj-share-gif").addEventListener("click", e => ajOut(e.currentTarget, ajGif, ".gif", true));
+$("aj-save-png").addEventListener("click", e => ajOut(e.currentTarget, ajPng, "-supersampler.png", false));
+$("aj-share-png").addEventListener("click", e => ajOut(e.currentTarget, ajPng, "-supersampler.png", true));
 $("aj-again").addEventListener("click", () => ajMode("camera"));
 
 /* Druck: vier Bilder ohne Abstand untereinander als ein durchgehender Streifen */
