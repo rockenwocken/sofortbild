@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Sofortbild</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Shrikhand&family=Oswald:wght@500;700&display=swap">
 <style>
 /* Layout: randloser Sucher über den ganzen Bildschirm, nur der Auslöser bleibt sichtbar.
    Nach oben wischen: Stufe 1 zeigt drei Werkzeuge, Stufe 2 schiebt die Einstellungen als Lisa-Fenster herein. */
@@ -35,7 +35,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
 
 .alert {
-  position: fixed; z-index: 6; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px));
+  position: fixed; z-index: 20; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px));
   background: var(--white); border: 2px solid var(--black); box-shadow: 3px 3px 0 var(--black);
   display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 10px 12px; font-size: 14px; line-height: 1.35; pointer-events: auto;
 }
@@ -104,9 +104,143 @@ details summary { font-weight: 600; cursor: pointer; min-height: 30px; }
 #sheet canvas { display: block; width: 100%; image-rendering: pixelated; }
 #tray.out #sheet { transition: transform var(--eject, 3s) linear; transform: translateY(var(--sheet-y, 16px)); }
 @media (prefers-reduced-motion: reduce) { #tray.out #sheet, #panel, #dock, .tools { transition: none; } #flash.go { animation: none; } }
+/* ===== Startbildschirm und Ansichten ===== */
+body:not([data-view="cool"]) :is(#finder, #dock, #panel, #tray) { display: none !important; }
+body:not([data-view="home"]) #home { display: none !important; }
+body:not([data-view="action"]) #action { display: none !important; }
+
+#home { position: fixed; inset: 0; display: grid; grid-template-rows: 1fr 1fr; z-index: 10; }
+.pick { border: 0; padding: 0; margin: 0; display: grid; place-items: center; position: relative; overflow: hidden; }
+.pick-cool { background: var(--white) repeating-conic-gradient(var(--black) 0 25%, var(--white) 0 50%) 0 0 / 2px 2px; padding-top: env(safe-area-inset-top, 0px); }
+.pick-cool .win { background: var(--white); border: 2px solid var(--black); box-shadow: 4px 4px 0 var(--black); width: min(76vw, 300px); }
+.pick-cool .win b { display: block; padding: 22px 16px 24px; font: 700 34px/1 var(--ui); letter-spacing: .01em; }
+.pick-cool .win small { display: block; padding: 0 16px 16px; font: 400 14px var(--ui); }
+.pick-action { background: var(--aj-cream); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pick-action .stripes { position: absolute; left: -10%; right: -10%; top: 50%; height: 120px; transform: translateY(-50%) rotate(-8deg);
+  background: linear-gradient(var(--aj-mustard) 0 33.3%, var(--aj-orange) 0 66.6%, var(--aj-brown) 0); }
+.pick-action b { position: relative; font: 400 clamp(44px, 14vw, 64px)/1 var(--aj-display); color: var(--aj-cream); text-shadow: 3px 3px 0 var(--aj-brown), 5px 5px 0 var(--aj-orange); transform: rotate(-8deg); }
+.pick-action small { position: absolute; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); font: 500 13px var(--aj-label); letter-spacing: .2em; text-transform: uppercase; color: var(--aj-brown); }
+.pick:focus-visible { outline: 3px dashed var(--black); outline-offset: -8px; }
+
+/* ===== Action Jackson: Super-8-Kamera aus den 70ern ===== */
+:root {
+  --aj-cream: #efe2c4; --aj-brown: #3a2418; --aj-orange: #d4602a; --aj-mustard: #e3a92b; --aj-chrome: #c9c6bd; --aj-leather: #23170f;
+  --aj-display: "Shrikhand", "Cooper Black", Georgia, serif; --aj-label: "Oswald", "Arial Narrow", sans-serif;
+}
+#action { position: fixed; inset: 0; z-index: 10; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--aj-leather);
+  background-image: radial-gradient(#ffffff08 1px, transparent 1.5px), radial-gradient(#00000040 1px, transparent 1.5px); background-size: 5px 5px, 7px 7px;
+  color: var(--aj-cream); font-family: var(--aj-label); touch-action: none; }
+.aj-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(10px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));
+  background: var(--aj-cream); color: var(--aj-brown); border-bottom: 6px solid var(--aj-brown); box-shadow: 0 -12px 0 -6px var(--aj-orange) inset, 0 -18px 0 -12px var(--aj-mustard) inset; }
+.aj-logo { font: 400 26px/1 var(--aj-display); color: var(--aj-orange); text-shadow: 2px 2px 0 var(--aj-brown); white-space: nowrap; }
+.aj-badge { font: 700 12px var(--aj-label); letter-spacing: .18em; border: 2px solid var(--aj-brown); border-radius: 4px; padding: 3px 6px; }
+.aj-home { background: none; border: 2px solid var(--aj-brown); border-radius: 50%; width: 36px; height: 36px; padding: 0; display: grid; place-items: center; color: var(--aj-brown); font: 700 18px var(--aj-label); }
+
+.aj-gate { position: relative; margin: 14px max(14px, env(safe-area-inset-right, 0px)) 10px max(14px, env(safe-area-inset-left, 0px)); border-radius: 26px; overflow: hidden; background: #000;
+  box-shadow: 0 0 0 6px #111, 0 0 0 9px var(--aj-chrome), 0 0 0 12px #111, inset 0 0 60px 20px #000; }
+.aj-gate video, .aj-gate canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: sepia(.38) saturate(1.45) contrast(1.12) brightness(1.03) hue-rotate(-8deg); }
+.aj-gate.mirror video { transform: scaleX(-1); }
+.aj-gate::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, #000a 100%); }
+.aj-gate::after { content: ""; position: absolute; inset: -50%; z-index: 2; pointer-events: none; opacity: .18;
+  background-image: radial-gradient(#fff 0.6px, transparent 1px), radial-gradient(#000 0.6px, transparent 1px); background-size: 3px 3px, 4px 4px;
+  animation: grain .25s steps(3) infinite; }
+@keyframes grain { 0% { transform: translate(0, 0); } 33% { transform: translate(-3%, 2%); } 66% { transform: translate(2%, -3%); } }
+.aj-corner { position: absolute; z-index: 3; width: 26px; height: 26px; border: 3px solid #fff8; pointer-events: none; }
+.aj-corner.tl { top: 14px; left: 14px; border-right: 0; border-bottom: 0; } .aj-corner.tr { top: 14px; right: 14px; border-left: 0; border-bottom: 0; }
+.aj-corner.bl { bottom: 14px; left: 14px; border-right: 0; border-top: 0; } .aj-corner.br { bottom: 14px; right: 14px; border-left: 0; border-top: 0; }
+.aj-count { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; font: 400 min(42vw, 220px)/1 var(--aj-display); color: var(--aj-cream); text-shadow: 6px 6px 0 var(--aj-orange); pointer-events: none; }
+.aj-frame { position: absolute; z-index: 4; top: 16px; left: 50%; transform: translateX(-50%); background: var(--aj-orange); color: var(--aj-cream); font: 700 15px var(--aj-label); letter-spacing: .15em; padding: 4px 10px; border-radius: 4px; }
+.aj-flash { position: absolute; inset: 0; z-index: 5; background: #fff6df; opacity: 0; pointer-events: none; }
+.aj-flash.go { animation: flash .25s ease-out; }
+.aj-rec { position: absolute; z-index: 4; top: 18px; right: 22px; width: 14px; height: 14px; border-radius: 50%; background: #e2302a; box-shadow: 0 0 10px #e2302a; animation: blink 1s steps(2) infinite; }
+
+.aj-deck { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(#d6d3ca, #a9a59b); color: var(--aj-brown); border-top: 4px solid #111; box-shadow: inset 0 2px 0 #fff8; }
+.aj-switches { display: flex; gap: 14px; }
+.toggle { background: none; border: 0; padding: 0; display: grid; justify-items: center; gap: 4px; color: var(--aj-brown); font: 700 11px var(--aj-label); letter-spacing: .14em; }
+.toggle .plate { width: 46px; height: 64px; border-radius: 8px; position: relative; background: linear-gradient(#2a2622, #4a443d); box-shadow: inset 0 0 0 2px #111, 0 2px 0 #fff8; }
+.toggle .plate::before { content: ""; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #8d8a82 60%, #3b3833); }
+.toggle .lever { position: absolute; left: 50%; top: calc(50% - 28px); width: 10px; height: 28px; margin-left: -5px; border-radius: 5px; transform-origin: 50% 100%; transform: rotate(155deg);
+  background: linear-gradient(90deg, #6d6a63, #f2f0ea 45%, #8d8a82); box-shadow: 0 2px 2px #0008; transition: transform .12s ease-out; }
+.toggle .lever::after { content: ""; position: absolute; left: -3px; top: -4px; width: 16px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 30%, #fff, #9b988f); }
+.toggle[aria-pressed="true"] .lever { transform: rotate(25deg); }
+.toggle .on, .toggle .off { font-size: 10px; letter-spacing: .1em; opacity: .55; }
+.toggle[aria-pressed="true"] .on, .toggle[aria-pressed="false"] .off { opacity: 1; }
+.toggle[disabled] { opacity: .5; }
+
+.aj-shutter { justify-self: center; width: 92px; height: 92px; border-radius: 50%; border: 0; padding: 0;
+  background: radial-gradient(circle at 50% 50%, var(--aj-orange) 0 30px, #8c3412 31px 33px, var(--aj-chrome) 34px 40px, #555 41px 44px, transparent 45px),
+              radial-gradient(circle at 40% 30%, #fff, #8d8a82); box-shadow: 0 5px 0 #4a4640, 0 7px 10px #0007; transition: transform .06s; }
+.aj-shutter:active { transform: translateY(4px); box-shadow: 0 1px 0 #4a4640; }
+.aj-shutter[disabled] { filter: grayscale(.8); }
+
+.aj-wheelbox { display: grid; grid-template-columns: auto auto; align-items: center; gap: 8px; }
+.aj-readout { display: grid; justify-items: end; font: 700 11px var(--aj-label); letter-spacing: .14em; }
+.aj-readout output { font: 700 20px var(--aj-label); letter-spacing: 0; background: #1c1712; color: var(--aj-mustard); padding: 2px 6px; border-radius: 3px; min-width: 62px; text-align: right; font-variant-numeric: tabular-nums; box-shadow: inset 0 0 0 2px #000; }
+.aj-wheel { width: 34px; height: 92px; border-radius: 10px; position: relative; overflow: hidden; touch-action: none; cursor: ns-resize;
+  background: linear-gradient(90deg, #111, #333 15%, transparent 30% 70%, #333 85%, #111), repeating-linear-gradient(#2b2722 0 3px, #8f8a80 3px 5px, #2b2722 5px 7px) 0 var(--wheel, 0px) / 100% 7px;
+  box-shadow: inset 0 0 0 2px #000, inset 0 12px 12px -6px #000, inset 0 -12px 12px -6px #000; }
+.aj-wheel:focus-visible { outline: 3px solid var(--aj-orange); outline-offset: 3px; }
+
+/* Ergebnis */
+#ajresult { overflow-y: auto; touch-action: pan-y; padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 16px; align-content: start; justify-items: center; }
+.aj-anim { width: min(100%, 270px); border-radius: 18px; overflow: hidden; position: relative; background: #000; box-shadow: 0 0 0 5px #111, 0 0 0 8px var(--aj-chrome); }
+.aj-anim canvas { width: 100%; height: auto; aspect-ratio: 3 / 4; display: block; filter: sepia(.38) saturate(1.45) contrast(1.12) hue-rotate(-8deg); }
+.aj-label { font: 700 12px var(--aj-label); letter-spacing: .2em; text-transform: uppercase; color: var(--aj-mustard); justify-self: start; width: min(100%, 360px); margin: 0 auto -8px; }
+.aj-sampler { width: min(100%, 360px); display: block; border: 8px solid #111; border-radius: 4px; box-shadow: 0 0 0 2px var(--aj-chrome); filter: sepia(.3) saturate(1.35) contrast(1.1) hue-rotate(-8deg); }
+.aj-actions { display: flex; gap: 12px; width: min(100%, 360px); }
+.aj-btn { flex: 1 1 0; min-height: 52px; border: 0; border-radius: 10px; font: 700 16px var(--aj-label); letter-spacing: .12em; text-transform: uppercase; color: var(--aj-cream); background: var(--aj-brown); box-shadow: 0 4px 0 #000; }
+.aj-btn.main { background: var(--aj-orange); color: var(--aj-cream); box-shadow: 0 4px 0 #7a3010; }
+.aj-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
+.aj-btn[disabled] { opacity: .6; }
+body[data-view="action"][data-aj="result"] :is(.aj-gate, .aj-deck) { display: none; }
+body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
+@media (prefers-reduced-motion: reduce) { .aj-gate::after, .aj-rec { animation: none; } }
+
 </style>
 </head>
-<body data-level="0">
+<body data-level="0" data-view="home">
+<div id="home">
+  <button class="pick pick-cool" id="go-cool" type="button"><span class="win"><span class="titlebar"><span>Sofortbild</span></span><b>Coolaroid</b><small>Ein Foto, sofort gedruckt.</small></span></button>
+  <button class="pick pick-action" id="go-action" type="button"><span class="stripes"></span><b>Action Jackson</b><small>4 Bilder · Super-8-Streifen</small></button>
+</div>
+
+<div id="action">
+  <header class="aj-top">
+    <button class="aj-home" id="aj-home" type="button" aria-label="Zurück zur Auswahl">‹</button>
+    <span class="aj-logo">Action Jackson</span>
+    <span class="aj-badge">SUPER 4</span>
+  </header>
+  <div class="aj-gate" id="ajgate">
+    <span class="aj-corner tl"></span><span class="aj-corner tr"></span><span class="aj-corner bl"></span><span class="aj-corner br"></span>
+    <div class="aj-count" id="ajcount" hidden></div>
+    <div class="aj-frame" id="ajframe" hidden></div>
+    <div class="aj-rec" id="ajrec" hidden></div>
+    <div class="aj-flash" id="ajflash"></div>
+  </div>
+  <div class="aj-deck">
+    <div class="aj-switches">
+      <button class="toggle" id="aj-cam" type="button" aria-pressed="false"><span class="on">VORNE</span><span class="plate"><span class="lever"></span></span><span class="off">HINTEN</span></button>
+      <button class="toggle" id="aj-light" type="button" aria-pressed="false"><span class="on">AN</span><span class="plate"><span class="lever"></span></span><span class="off">LICHT</span></button>
+    </div>
+    <button class="aj-shutter" id="aj-shutter" type="button" aria-label="Countdown starten und vier Bilder aufnehmen"></button>
+    <div class="aj-wheelbox">
+      <div class="aj-readout">TAKT<output id="aj-int">0,5 s</output></div>
+      <div class="aj-wheel" id="aj-wheel" role="slider" tabindex="0" aria-label="Abstand zwischen den Bildern" aria-valuemin="0.2" aria-valuemax="5"></div>
+    </div>
+  </div>
+  <div id="ajresult">
+    <div class="aj-anim"><canvas id="aj-anim" width="480" height="640"></canvas></div>
+    <div class="aj-label">Supersampler</div>
+    <canvas class="aj-sampler" id="aj-sampler" width="1200" height="800"></canvas>
+    <div class="aj-actions">
+      <button class="aj-btn" id="aj-again" type="button">Nochmal</button>
+      <button class="aj-btn main" id="aj-print" type="button">Drucken</button>
+    </div>
+  </div>
+</div>
+
 <div id="finder">
   <canvas id="vf" width="384" height="800" aria-label="Sucher mit Druckvorschau"></canvas>
   <div id="flash"></div>
@@ -326,8 +460,8 @@ function comparePage(src, sw, sh, mirror) {
 const BASE_FEED = 70;
 const TEAR_LINES = () => BASE_FEED + S.feed * 8;
 const FONT = '"Pixelify Sans", monospace';
-function composePage(p, now = new Date(), label = "", tear = TEAR_LINES()) {
-  const c = document.createElement("canvas"), m = S.frame ? 16 : 0;
+function composePage(p, now = new Date(), label = "", tear = TEAR_LINES(), frame = S.frame) {
+  const c = document.createElement("canvas"), m = frame ? 16 : 0;
   const stamp = S.date ? now.toLocaleDateString("de-DE") + "  " + now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "";
   const small = [label, stamp].filter(Boolean).join("  ·  ");
   const caption = [S.caption.trim() && { t: S.caption.trim(), size: 30, gap: 38 }, small && { t: small, size: 20, gap: 28 }].filter(Boolean);
@@ -471,6 +605,8 @@ function updateStatus(text) {
     ? `${printer.device.name || "Drucker"} verbunden`
     : (printer.device ? `${printer.device.name || "Drucker"} getrennt` : "Kein Drucker verbunden");
   $("progress").hidden = !(busy && text);
+  $("aj-print").textContent = busy ? (text ? text.replace("Druckt …", "Druckt") : "Verbinde …") : "Drucken";
+  $("aj-print").disabled = busy;
   if (busy && text) $("progress").textContent = text;
 }
 printer.onchange = () => updateStatus();
@@ -606,7 +742,7 @@ const source = () => stillSource
 let lastFrame = 0;
 function loop(t) {
   requestAnimationFrame(loop);
-  if (document.hidden || t - lastFrame < 90 || !$("sheetbar").hidden || document.body.dataset.level === "2") return;
+  if (document.hidden || t - lastFrame < 90 || !$("sheetbar").hidden || document.body.dataset.level === "2" || document.body.dataset.view !== "cool") return;
   lastFrame = t;
   const s = source(), p = photoBits(s.src, s.w, s.h, s.mirror);
   if (vf.width !== p.w || vf.height !== p.h) { vf.width = p.w; vf.height = p.h; }
@@ -792,7 +928,7 @@ function setLevel(n) {
 }
 let swipe = null, lastSwipe = 0;
 addEventListener("pointerdown", e => {
-  if (!$("sheetbar").hidden) return;
+  if (!$("sheetbar").hidden || document.body.dataset.view !== "cool") return;
   if (e.target.closest("input, select, textarea, pre")) return;
   swipe = { x: e.clientX, y: e.clientY, t: performance.now(), top: $("panelscroll").scrollTop, inPanel: !!e.target.closest("#panel") };
 });
@@ -834,8 +970,163 @@ for (const [k, id] of Object.entries(F)) $(id).addEventListener("input", e => {
 async function keepAwake() { try { await navigator.wakeLock.request("screen"); } catch (e) {} }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
 
+
+/* ===================== Ansichten ===================== */
+function show(view) {
+  const was = document.body.dataset.view;
+  if (was === view) return;
+  if (torchOn && view !== was) setTorch(false).catch(() => {});
+  document.body.dataset.view = view;
+  if (view === "home") {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null; video.srcObject = null;
+    return;
+  }
+  if (view === "action") { $("ajgate").prepend(video); ajMode("camera"); }
+  if (!stream) startCamera().then(syncSwitches);
+}
+const route = () => show(location.hash === "#coolaroid" ? "cool" : location.hash === "#action" ? "action" : "home");
+addEventListener("hashchange", route);
+if (location.hash) history.replaceState(null, "", location.pathname);
+$("go-cool").addEventListener("click", () => { location.hash = "coolaroid"; });
+$("go-action").addEventListener("click", () => { location.hash = "action"; });
+$("aj-home").addEventListener("click", () => history.length > 1 ? history.back() : (location.hash = ""));
+
+/* ===================== Action Jackson ===================== */
+const INTERVALS = [0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 4, 5];
+if (S.ajInt == null || !INTERVALS.includes(S.ajInt)) S.ajInt = 0.5;
+let ajFrames = [], ajRunning = false, ajAnimTimer = null, ajTime = null;
+function ajMode(m) { document.body.dataset.aj = m; if (m !== "result") clearInterval(ajAnimTimer); }
+function syncSwitches() {
+  $("aj-cam").setAttribute("aria-pressed", String(facing === "user"));
+  $("aj-light").setAttribute("aria-pressed", String(torchOn));
+  $("ajgate").classList.toggle("mirror", facing === "user");
+}
+function showInterval() {
+  $("aj-int").textContent = S.ajInt.toLocaleString("de-DE") + " s";
+  const w = $("aj-wheel"); w.setAttribute("aria-valuenow", S.ajInt); w.setAttribute("aria-valuetext", $("aj-int").textContent);
+}
+showInterval();
+
+/* Rändelrad: senkrecht ziehen, jede Rille ein Schritt */
+(() => {
+  const w = $("aj-wheel"); let y0 = null, idx0 = 0, offset = 0;
+  const step = d => {
+    const i = Math.max(0, Math.min(INTERVALS.length - 1, INTERVALS.indexOf(S.ajInt) + d));
+    if (INTERVALS[i] !== S.ajInt) { S.ajInt = INTERVALS[i]; save(); showInterval(); tick(); }
+  };
+  w.addEventListener("pointerdown", e => { y0 = e.clientY; idx0 = INTERVALS.indexOf(S.ajInt); w.setPointerCapture(e.pointerId); });
+  w.addEventListener("pointermove", e => {
+    if (y0 == null) return;
+    const dy = y0 - e.clientY; offset = -dy;
+    w.style.setProperty("--wheel", offset + "px");
+    const target = Math.max(0, Math.min(INTERVALS.length - 1, idx0 + Math.round(dy / 18)));
+    step(target - INTERVALS.indexOf(S.ajInt));
+  });
+  const end = () => { y0 = null; };
+  w.addEventListener("pointerup", end); w.addEventListener("pointercancel", end);
+  w.addEventListener("wheel", e => { e.preventDefault(); step(e.deltaY < 0 ? 1 : -1); offset += e.deltaY < 0 ? -6 : 6; w.style.setProperty("--wheel", offset + "px"); }, { passive: false });
+  w.addEventListener("keydown", e => {
+    if (e.key === "ArrowUp" || e.key === "ArrowRight") { step(1); e.preventDefault(); }
+    if (e.key === "ArrowDown" || e.key === "ArrowLeft") { step(-1); e.preventDefault(); }
+  });
+})();
+
+/* Töne: Countdown-Pieper und ein leises Klicken am Rad */
+function tone2(freq, dur, gain = .25, type = "square") {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + .02);
+  } catch (e) {}
+}
+const tick = () => tone2(2400, .015, .08, "triangle");
+
+$("aj-cam").addEventListener("click", async () => {
+  if (ajRunning) return;
+  facing = facing === "user" ? "environment" : "user";
+  syncSwitches(); await startCamera(); syncSwitches();
+});
+$("aj-light").addEventListener("click", async () => {
+  if (ajRunning) return;
+  await toggleTorch(); syncSwitches();
+});
+
+function grabFrame() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const c = document.createElement("canvas");
+  if (!vw) { const s = sample || (sample = makeSample()); c.width = 480; c.height = 640; c.getContext("2d").drawImage(s, -80, 0, 640, 640); return c; }
+  const k = Math.min(1, 900 / Math.max(vw, vh));
+  c.width = Math.round(vw * k); c.height = Math.round(vh * k);
+  const x = c.getContext("2d");
+  if (facing === "user") { x.translate(c.width, 0); x.scale(-1, 1); }
+  x.drawImage(video, 0, 0, c.width, c.height);
+  return c;
+}
+async function ajShoot() {
+  if (ajRunning) return;
+  ajRunning = true; $("aj-shutter").disabled = true;
+  try {
+    const count = $("ajcount");
+    for (const n of [3, 2, 1]) {
+      count.hidden = false; count.textContent = n; tone2(880, .14);
+      if (navigator.vibrate) navigator.vibrate(40);
+      await sleep(1000);
+    }
+    count.hidden = true;
+    ajFrames = []; ajTime = new Date();
+    $("ajrec").hidden = false;
+    for (let i = 0; i < 4; i++) {
+      if (i) await sleep(S.ajInt * 1000);
+      tone2(1760, .08, .3);
+      shutterSound();
+      const fl = $("ajflash"); fl.classList.remove("go"); void fl.offsetWidth; fl.classList.add("go");
+      $("ajframe").hidden = false; $("ajframe").textContent = `${i + 1} / 4`;
+      ajFrames.push(grabFrame());
+    }
+    await sleep(350);
+    $("ajrec").hidden = true; $("ajframe").hidden = true;
+    ajShowResult();
+  } finally { ajRunning = false; $("aj-shutter").disabled = false; }
+}
+$("aj-shutter").addEventListener("click", ajShoot);
+
+/* Bild mittig zuschneiden */
+function cover(ctx, img, x, y, w, h) {
+  const s = Math.max(w / img.width, h / img.height), cw = w / s, ch = h / s;
+  ctx.drawImage(img, (img.width - cw) / 2, (img.height - ch) / 2, cw, ch, x, y, w, h);
+}
+function ajShowResult() {
+  ajMode("result");
+  /* Supersampler: vier schmale Panoramastreifen übereinander in einem 3:2-Bild */
+  const sm = $("aj-sampler"), sx = sm.getContext("2d"), H = sm.height, W = sm.width, line = 6, sh = (H - 3 * line) / 4;
+  sx.fillStyle = "#0b0907"; sx.fillRect(0, 0, W, H);
+  ajFrames.forEach((f, i) => cover(sx, f, 0, Math.round(i * (sh + line)), W, Math.round(sh)));
+  /* Animation: die vier Bilder laufen nacheinander wie ein Daumenkino */
+  const an = $("aj-anim"), ax = an.getContext("2d"); let i = 0;
+  const draw = () => { cover(ax, ajFrames[i % 4], 0, 0, an.width, an.height); i++; };
+  draw(); clearInterval(ajAnimTimer);
+  ajAnimTimer = setInterval(draw, Math.max(150, Math.min(600, S.ajInt * 1000)));
+  $("ajresult").scrollTop = 0;
+}
+$("aj-again").addEventListener("click", () => ajMode("camera"));
+
+/* Druck: vier Bilder ohne Abstand untereinander als ein durchgehender Streifen */
+function ajStripPage() {
+  const w = HEAD_WIDTH, fh = Math.round(w * 4 / 3), h = fh * 4;
+  const g = new Float32Array(w * h);
+  ajFrames.forEach((f, i) => g.set(grayCover(f, f.width, f.height, w, fh, false), i * w * fh));
+  tone(g, S.bright / 100, .01);
+  sharpen(g, w, h, S.sharp / 50);
+  return composePage({ bits: dither(g, w, h, S.dither), w, h }, ajTime, "", TEAR_LINES(), false);
+}
+$("aj-print").addEventListener("click", () => { if (ajFrames.length === 4) runPrint(ajStripPage()); });
+
 window.Sofortbild = { printer, crc8, cmd, packPage, composePage, dither };
-updateStatus(); keepAwake(); startCamera(); requestAnimationFrame(loop);
+updateStatus(); keepAwake(); requestAnimationFrame(loop);
 /* Schrift für den Drucktext vorab laden, sonst druckt Canvas mit Ersatzschrift */
 if (document.fonts) document.fonts.load(`700 30px ${FONT}`).catch(() => {});
 if (!canBluetooth()) hint(NO_BT);
