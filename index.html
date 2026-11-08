@@ -66,7 +66,8 @@ body:not([data-level="1"]) .tools { opacity: 0; transform: translateY(16px); poi
 #shutter[disabled] { background: var(--white); }
 #shutter[disabled]::after { background: repeating-conic-gradient(var(--black) 0 25%, var(--white) 0 50%) 0 0 / 2px 2px; }
 #progress { min-height: 18px; padding: 2px 8px; background: var(--white); border: 1.5px solid var(--black); font-size: 13px; }
-.sheetbar { display: flex; gap: 14px; }
+.sheetbar { display: flex; gap: 10px; width: 100%; max-width: 440px; }
+.sheetbar .btn { flex: 1 1 0; min-width: 0; padding-inline: 6px; line-height: 1.15; text-align: center; }
 body[data-level="2"] #dock { transform: translateY(40px); visibility: hidden; }
 
 /* Einstellungen als Fenster von unten */
@@ -124,6 +125,7 @@ details summary { font-weight: 600; cursor: pointer; min-height: 30px; }
     <button class="btn default" id="shutter" type="button" aria-label="Foto machen und drucken"></button>
   </div>
   <div class="sheetbar" id="sheetbar" hidden>
+    <button class="btn" id="save" type="button">Speichern</button>
     <button class="btn" id="again" type="button">Nochmal drucken</button>
     <button class="btn default" id="done" type="button">Nächstes Foto</button>
   </div>
@@ -694,21 +696,76 @@ function shoot() {
   shutterSound();
   if (navigator.vibrate) navigator.vibrate(30);
   const s = source();
+  lastTime = new Date();
   if (S.compare) {
     /* Ein Standbild festhalten, damit alle drei Drucke exakt dasselbe Motiv zeigen */
     const still = document.createElement("canvas"); still.width = s.w; still.height = s.h;
     still.getContext("2d").drawImage(s.src, 0, 0, s.w, s.h);
     lastPage = comparePage(still, s.w, s.h, s.mirror);
-  } else lastPage = composePage(photoBits(s.src, s.w, s.h, s.mirror));
+    lastPhoto = photoBits(still, s.w, s.h, s.mirror);
+  } else {
+    lastPhoto = photoBits(s.src, s.w, s.h, s.mirror);
+    lastPage = composePage(lastPhoto, lastTime);
+  }
   stillSource = null;
   showSheet(lastPage);
   runPrint(lastPage);
+}
+
+/* Polaroid zum Speichern: das gedruckte Punktbild, schmaler Rand oben und seitlich,
+   breiter Rand unten mit Text und Datum (Proportionen wie ein Polaroid-Original, ca. 88 × 107 mm) */
+let lastPhoto = null, lastTime = null;
+function polaroidCanvas(p, now) {
+  const k = 3, pw = p.w * k, ph = p.h * k;
+  const side = Math.round(pw * .06), bottom = Math.round(pw * .30);
+  const c = document.createElement("canvas");
+  c.width = pw + 2 * side; c.height = ph + side + bottom;
+  const x = c.getContext("2d");
+  x.fillStyle = "#fbfaf5"; x.fillRect(0, 0, c.width, c.height);
+  /* Punktbild ohne Glättung hochskalieren, damit jeder Druckpunkt scharf bleibt */
+  const tmp = document.createElement("canvas"); tmp.width = p.w; tmp.height = p.h;
+  paintBits(tmp.getContext("2d"), p.bits, p.w, p.h);
+  x.imageSmoothingEnabled = false;
+  x.drawImage(tmp, side, side, pw, ph);
+  x.strokeStyle = "rgba(0,0,0,.08)"; x.lineWidth = 2; x.strokeRect(side - 1, side - 1, pw + 2, ph + 2);
+  const caption = S.caption.trim();
+  const stamp = S.date ? now.toLocaleDateString("de-DE") + "  " + now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "";
+  x.fillStyle = "#1a1c1c"; x.textAlign = "center"; x.textBaseline = "middle";
+  const mid = side + ph + bottom / 2, cx = c.width / 2, maxW = pw;
+  if (caption && stamp) {
+    x.font = `700 ${Math.round(bottom * .26)}px ${FONT}`; x.fillText(caption, cx, mid - bottom * .12, maxW);
+    x.font = `400 ${Math.round(bottom * .15)}px ${FONT}`; x.fillText(stamp, cx, mid + bottom * .2, maxW);
+  } else if (caption || stamp) {
+    x.font = `${caption ? 700 : 400} ${Math.round(bottom * (caption ? .28 : .17))}px ${FONT}`;
+    x.fillText(caption || stamp, cx, mid, maxW);
+  }
+  return c;
+}
+async function savePolaroid() {
+  if (!lastPhoto) return;
+  const btn = $("save");
+  try {
+    await (document.fonts ? document.fonts.load(`700 40px ${FONT}`) : Promise.resolve());
+    const c = polaroidCanvas(lastPhoto, lastTime);
+    const blob = await new Promise(ok => c.toBlob(ok, "image/png"));
+    const t = lastTime, pad = n => String(n).padStart(2, "0");
+    const name = `sofortbild-${t.getFullYear()}${pad(t.getMonth() + 1)}${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}${pad(t.getSeconds())}.png`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    btn.textContent = "Gespeichert";
+  } catch (e) {
+    hint("Das Foto konnte nicht gespeichert werden. Prüfe, ob Chrome Downloads erlaubt sind.");
+  }
+  setTimeout(() => { btn.textContent = "Speichern"; }, 2500);
 }
 
 /* ---------- Bedienelemente ---------- */
 $("shutter").addEventListener("click", shoot);
 $("again").addEventListener("click", () => { if (lastPage) { showSheet(lastPage); runPrint(lastPage); } });
 $("done").addEventListener("click", hideSheet);
+$("save").addEventListener("click", savePolaroid);
 $("torch").addEventListener("click", toggleTorch);
 $("flip").addEventListener("click", () => { facing = facing === "user" ? "environment" : "user"; startCamera(); });
 $("pick").addEventListener("click", () => $("file").click());
