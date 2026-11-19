@@ -1337,7 +1337,7 @@ $("aj-home").addEventListener("click", () => history.length > 1 ? history.back()
 /* ===================== Action Jackson ===================== */
 const INTERVALS = [0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 4, 5];
 if (S.ajInt == null || !INTERVALS.includes(S.ajInt)) S.ajInt = 0.5;
-let ajFrames = [], ajRunning = false, ajAnimTimer = null, ajTime = null;
+let ajLit = false, ajFrames = [], ajRunning = false, ajAnimTimer = null, ajTime = null;
 function ajMode(m) { document.body.dataset.aj = m; if (m !== "result") clearInterval(ajAnimTimer); }
 function syncSwitches() {
   $("aj-cam").setAttribute("aria-pressed", String(facing === "user"));
@@ -1419,7 +1419,7 @@ async function ajShoot() {
       await sleep(1000);
     }
     count.hidden = true;
-    ajFrames = []; ajTime = new Date();
+    ajFrames = []; ajTime = new Date(); ajLit = torchOn;
     $("ajrec").hidden = false;
     for (let i = 0; i < 4; i++) {
       if (i) await sleep(S.ajInt * 1000);
@@ -1532,7 +1532,8 @@ function ajStripPage(layout = S.ajLayout) {
   /* Alle vier Bilder gemeinsam abstimmen und rastern, damit sie gleich hell wirken */
   const g = new Float32Array(fw * fh * 4);
   ajFrames.forEach((f, i) => g.set(grayCover(f, f.width, f.height, fw, fh, false, true), i * fw * fh));
-  const strip = process(g, fw, fh * 4, { lit: false });
+  /* Gleiche Bildstrecke wie Coolaroid; mit Lampe auch der Licht-Ausgleich */
+  const strip = process(g, fw, fh * 4, { lit: ajLit });
   const bits = new Uint8Array(L.w * L.h);
   for (let i = 0; i < 4; i++) {
     const [x0, y0] = L.pos(i);
