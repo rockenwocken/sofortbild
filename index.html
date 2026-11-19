@@ -197,6 +197,18 @@ body:not([data-view="action"]) #action { display: none !important; }
 .aj-label { font: 700 12px var(--aj-label); letter-spacing: .2em; text-transform: uppercase; color: var(--aj-mustard); justify-self: start; width: min(100%, 360px); margin: 0 auto -8px; }
 .aj-sampler { width: min(100%, 360px); display: block; border: 8px solid #111; border-radius: 4px; box-shadow: 0 0 0 2px var(--aj-chrome); }
 .aj-actions { display: flex; gap: 12px; width: min(100%, 360px); }
+.aj-layouts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: min(100%, 360px); }
+.aj-layout { min-width: 0; overflow-wrap: anywhere; display: grid; justify-items: center; gap: 6px; padding: 10px 4px; border: 0; border-radius: 10px; background: #4a3326; color: var(--aj-cream);
+  font: 700 12px var(--aj-label); letter-spacing: .08em; text-transform: uppercase; box-shadow: 0 3px 0 #000; }
+.aj-layout[aria-checked="true"] { background: var(--aj-mustard); color: var(--aj-brown); box-shadow: 0 3px 0 #7a5a10; }
+.aj-layout .ico { display: grid; gap: 2px; height: 34px; align-content: center; justify-content: center; }
+.aj-layout .ico i { display: block; background: currentColor; border-radius: 1px; }
+.ico.film { grid-template-columns: 9px; } .ico.film i { height: 7px; }
+.ico.grid { grid-template-columns: 12px 12px; } .ico.grid i { height: 15px; }
+.ico.row { grid-template-columns: repeat(4, 6px); } .ico.row i { height: 20px; }
+.aj-preview { display: grid; justify-items: center; gap: 6px; width: min(100%, 360px); }
+.aj-preview canvas { width: 110px; height: auto; image-rendering: pixelated; background: #f3f1e8; box-shadow: 3px 3px 0 #000; }
+.aj-preview span { font: 500 12px var(--aj-label); letter-spacing: .1em; color: var(--aj-mustard); }
 .aj-btn { flex: 1 1 0; min-height: 52px; border: 0; border-radius: 10px; font: 700 16px var(--aj-label); letter-spacing: .12em; text-transform: uppercase; color: var(--aj-cream); background: var(--aj-brown); box-shadow: 0 4px 0 #000; }
 .aj-btn.main { background: var(--aj-orange); color: var(--aj-cream); box-shadow: 0 4px 0 #7a3010; }
 .aj-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
@@ -258,6 +270,13 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
       <button class="aj-btn small" id="aj-save-png" type="button">Speichern</button>
       <button class="aj-btn small" id="aj-share-png" type="button">Teilen</button>
     </div>
+    <div class="aj-label">Druckformat</div>
+    <div class="aj-layouts" role="radiogroup" aria-label="Druckformat">
+      <button class="aj-layout" type="button" role="radio" data-layout="film" aria-checked="false"><span class="ico film"><i></i><i></i><i></i><i></i></span>Filmstreifen</button>
+      <button class="aj-layout" type="button" role="radio" data-layout="grid" aria-checked="false"><span class="ico grid"><i></i><i></i><i></i><i></i></span>2 × 2</button>
+      <button class="aj-layout" type="button" role="radio" data-layout="row" aria-checked="false"><span class="ico row"><i></i><i></i><i></i><i></i></span>Nebeneinander</button>
+    </div>
+    <div class="aj-preview"><canvas id="aj-preview"></canvas><span id="aj-length"></span></div>
     <div class="aj-actions">
       <button class="aj-btn" id="aj-again" type="button">Nochmal</button>
       <button class="aj-btn main" id="aj-print" type="button">Drucken</button>
@@ -678,11 +697,11 @@ const BASE_FEED = 70;
 const TEAR_LINES = () => BASE_FEED + S.feed * 8;
 /* Schrift für alles Gedruckte und das Polaroid: Jost, eine freie Schrift im Stil der Futura */
 const FONT = '"Jost", "Futura", "Century Gothic", sans-serif';
-function composePage(p, now = new Date(), label = "", tear = TEAR_LINES(), frame = S.frame) {
+function composePage(p, now = new Date(), label = "", tear = TEAR_LINES(), frame = S.frame, text = S.caption.trim()) {
   const c = document.createElement("canvas"), m = frame ? 16 : 0;
   const stamp = S.date ? now.toLocaleDateString("de-DE") + "  " + now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "";
   const small = [label, stamp].filter(Boolean).join("  ·  ");
-  const caption = [S.caption.trim() && { t: S.caption.trim(), size: 30, gap: 38 }, small && { t: small, size: 20, gap: 28 }].filter(Boolean);
+  const caption = [text && { t: text, size: 30, gap: 38 }, small && { t: small, size: 20, gap: 28 }].filter(Boolean);
   const textH = caption.length ? 14 + caption.reduce((n, l) => n + l.gap, 0) : m;
   c.width = HEAD_WIDTH; c.height = m + p.h + textH + tear;
   const x = c.getContext("2d", { willReadFrequently: true });
@@ -1451,6 +1470,7 @@ function ajShowResult() {
   ajFrames.forEach((f, i) => cover(sx, f, Math.round((i % 2) * (cw + line)), Math.round(Math.floor(i / 2) * (ch + line)), Math.round(cw), Math.round(ch)));
   sx.filter = "none";
   ajStartAnim();
+  ajShowLayout();
   $("ajresult").scrollTop = 0;
 }
 const stampName = (t, ext) => { const p = n => String(n).padStart(2, "0"); return `action-jackson-${t.getFullYear()}${p(t.getMonth() + 1)}${p(t.getDate())}-${p(t.getHours())}${p(t.getMinutes())}${p(t.getSeconds())}${ext}`; };
@@ -1497,12 +1517,39 @@ $("aj-share-png").addEventListener("click", e => ajOut(e.currentTarget, ajPng, "
 $("aj-again").addEventListener("click", () => ajMode("camera"));
 
 /* Druck: vier Bilder ohne Abstand untereinander als ein durchgehender Streifen */
-function ajStripPage() {
-  const w = HEAD_WIDTH, fh = Math.round(w * 4 / 3), h = fh * 4;
-  const g = new Float32Array(w * h);
-  ajFrames.forEach((f, i) => g.set(grayCover(f, f.width, f.height, w, fh, false, true), i * w * fh));
-  return composePage({ bits: process(g, w, h, { lit: false }), w, h }, ajTime, "", TEAR_LINES(), false);
+/* Druckformate für die vier Bilder (Breite × Höhe je Bild in Druckpunkten, 8 Punkte = 1 mm):
+   Filmstreifen: hochkant 3:4 untereinander, schmal und mittig wie ein Filmstreifen (Bilder ca. 10 cm)
+   2 × 2: hochkant 3:4 in halber Breite (ca. 6,4 cm)
+   Nebeneinander: vier schmale Bilder in einer Reihe, höher zugeschnitten (ca. 2,8 cm) */
+const AJ_LAYOUTS = {
+  film: { fw: 150, fh: 200, pos: i => [117, i * 200], w: 384, h: 800 },
+  grid: { fw: 192, fh: 256, pos: i => [(i % 2) * 192, Math.floor(i / 2) * 256], w: 384, h: 512 },
+  row:  { fw: 96, fh: 224, pos: i => [i * 96, 0], w: 384, h: 224 }
+};
+if (!AJ_LAYOUTS[S.ajLayout]) S.ajLayout = "film";
+function ajStripPage(layout = S.ajLayout) {
+  const L = AJ_LAYOUTS[layout], { fw, fh } = L;
+  /* Alle vier Bilder gemeinsam abstimmen und rastern, damit sie gleich hell wirken */
+  const g = new Float32Array(fw * fh * 4);
+  ajFrames.forEach((f, i) => g.set(grayCover(f, f.width, f.height, fw, fh, false, true), i * fw * fh));
+  const strip = process(g, fw, fh * 4, { lit: false });
+  const bits = new Uint8Array(L.w * L.h);
+  for (let i = 0; i < 4; i++) {
+    const [x0, y0] = L.pos(i);
+    for (let y = 0; y < fh; y++) bits.set(strip.subarray((i * fh + y) * fw, (i * fh + y + 1) * fw), (y0 + y) * L.w + x0);
+  }
+  /* Kein eigener Text aus Coolaroid, nur Datum und Uhrzeit */
+  return composePage({ bits, w: L.w, h: L.h }, ajTime, "", TEAR_LINES(), false, "");
 }
+function ajShowLayout() {
+  document.querySelectorAll(".aj-layout").forEach(b => b.setAttribute("aria-checked", String(b.dataset.layout === S.ajLayout)));
+  if (ajFrames.length !== 4) return;
+  const page = ajStripPage(), c = $("aj-preview");
+  c.width = page.w; c.height = page.h;
+  paintBits(c.getContext("2d"), page.bits, page.w, page.h);
+  $("aj-length").textContent = `Zettel ca. ${(page.h / 80).toFixed(1).replace(".", ",")} cm`;
+}
+document.querySelectorAll(".aj-layout").forEach(b => b.addEventListener("click", () => { S.ajLayout = b.dataset.layout; save(); ajShowLayout(); }));
 $("aj-print").addEventListener("click", () => { if (ajFrames.length === 4) runPrint(ajStripPage()); });
 
 window.Sofortbild = { printer, crc8, cmd, packPage, composePage, dither };
