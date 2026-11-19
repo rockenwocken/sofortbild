@@ -327,7 +327,7 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
         <option value="bayer">Raster: Retro-Look</option>
       </select>
     </div>
-    <label class="check"><input id="s-compare" type="checkbox"><span>Vergleichsdruck<small>Jedes Foto fünfmal untereinander, einmal mit jedem Punktmuster.</small></span></label>
+    <label class="check"><input id="s-compare" type="checkbox"><span>Vergleichsdruck<small>Das Foto wird in fünf senkrechte Streifen geteilt, jeder mit einem anderen Punktmuster. So lang wie ein normales Foto.</small></span></label>
     <div class="field">
       <label for="s-bright">Bildhelligkeit <span class="val" id="v-bright"></span></label>
       <input id="s-bright" type="range" min="60" max="170" step="5">
@@ -596,7 +596,7 @@ function paintBits(ctx, bits, w, h, x = 0, y = 0) {
 }
 /* Gemeinsame Bildstrecke für Vorschau, Druck, Action Jackson und Kalibrierung:
    Tonwerte → Klarheit → Nachschärfen → Punktzuwachs → Punktmuster → Punktpaare */
-function process(g, w, h, o = {}) {
+function prep(g, w, h, o = {}) {
   const lit = o.lit != null ? o.lit : (typeof torchOn !== "undefined" && torchOn);
   /* Mit Lampe ist der Vordergrund überbelichtet: dunkler und härter abstimmen */
   if (!o.raw) {
@@ -605,23 +605,42 @@ function process(g, w, h, o = {}) {
     sharpen(g, w, h, S.sharp / 50);
   }
   dotGain(g, (o.gain != null ? o.gain : S.gain) / 100);
-  const kind = o.kind || S.dither, bits = dither(g, w, h, kind);
+  return g;
+}
+function finish(g, w, h, kind = S.dither) {
+  const bits = dither(g, w, h, kind);
   if (S.pairs && kind !== "bayer") pairDots(bits, w, h, false);
   return bits;
 }
+function process(g, w, h, o = {}) { return finish(prep(g, w, h, o), w, h, o.kind || S.dither); }
 function photoBits(src, sw, sh, mirror, kind = S.dither, hq = false) {
   const { w, h } = photoSize();
   const g = grayCover(src, sw, sh, w, h, mirror, hq);
   return { bits: process(g, w, h, { kind }), w, h };
 }
 const DITHER_NAMES = { atkinson: "Atkinson", floyd: "Floyd-Steinberg", stucki: "Stucki", blue: "Blue Noise", bayer: "Raster (Bayer 8x8)" };
-/* Vergleichsdruck: dasselbe Foto mit allen Punktmustern untereinander */
+/* Vergleichsdruck wie ein Teststreifen in der Dunkelkammer: ein Foto, in senkrechte Streifen geteilt,
+   jeder Streifen mit einem anderen Punktmuster. Jedes Muster rechnet über das ganze Bild, damit die Ränder sauber bleiben. */
+const SHORT_NAMES = { atkinson: "Atkinson", floyd: "Floyd", stucki: "Stucki", blue: "Blue N.", bayer: "Raster" };
 function comparePage(src, sw, sh, mirror) {
-  const now = new Date(), kinds = Object.keys(DITHER_NAMES);
-  const pages = kinds.map((k, i) => composePage(photoBits(src, sw, sh, mirror, k, true), now, DITHER_NAMES[k], i === kinds.length - 1 ? TEAR_LINES() : 28));
-  const h = pages.reduce((n, p) => n + p.h, 0), bits = new Uint8Array(HEAD_WIDTH * h);
-  let at = 0; for (const p of pages) { bits.set(p.bits, at); at += p.bits.length; }
-  return { bits, w: HEAD_WIDTH, h };
+  const { w, h } = photoSize(), kinds = Object.keys(DITHER_NAMES), n = kinds.length, labelH = 24;
+  const base = prep(grayCover(src, sw, sh, w, h, mirror, true), w, h);
+  const H = labelH + h, bits = new Uint8Array(w * H), edge = k => Math.round(k * w / n);
+  kinds.forEach((k, j) => {
+    const full = finish(base.slice(), w, h, k), x0 = edge(j), x1 = edge(j + 1);
+    for (let y = 0; y < h; y++) bits.set(full.subarray(y * w + x0, y * w + x1), (y + labelH) * w + x0);
+  });
+  /* Weiße Trennlinien zwischen den Streifen */
+  for (let j = 1; j < n; j++) for (let y = labelH; y < H; y++) { const x = edge(j); bits[y * w + x - 1] = 0; bits[y * w + x] = 0; }
+  /* Beschriftung über jedem Streifen */
+  const c = document.createElement("canvas"); c.width = w; c.height = labelH;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.fillStyle = "#fff"; x.fillRect(0, 0, w, labelH); x.fillStyle = "#000";
+  x.font = `600 13px ${FONT}`; x.textAlign = "center"; x.textBaseline = "middle";
+  kinds.forEach((k, j) => x.fillText(SHORT_NAMES[k], (edge(j) + edge(j + 1)) / 2, labelH / 2, edge(j + 1) - edge(j) - 4));
+  const d = x.getImageData(0, 0, w, labelH).data;
+  for (let i = 0; i < w * labelH; i++) bits[i] = d[i * 4 + 1] < 128 ? 1 : 0;
+  return composePage({ bits, w, h: H }, new Date());
 }
 /* Fertige Druckseite: 384 Punkte breit (8 Punkte pro mm), inklusive Rahmen, Text und Vorschub zum Abreißen.
    Der Abreißkante liegt ein Stück hinter dem Druckkopf, daher der Grundvorschub plus einstellbarer Rest. */
