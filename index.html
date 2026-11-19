@@ -345,7 +345,7 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
     <hr>
     <div class="field">
       <button class="btn" id="calib" type="button" style="display:inline-block;justify-self:start">Kalibrierstreifen drucken</button>
-      <small>Druckt Graustufen und einen Bildausschnitt mit fünf Stufen Punktzuwachs. Wähle danach die Stufe, deren Treppe am gleichmäßigsten von Weiß nach Schwarz läuft.</small>
+      <small>Druckt Graustufen und einen Bildausschnitt mit drei Stufen Punktzuwachs rund um den aktuellen Wert. Wähle danach die Stufe, deren Treppe am gleichmäßigsten von Weiß nach Schwarz läuft.</small>
     </div>
     <div class="field">
       <label for="s-gain">Punktzuwachs ausgleichen <span class="val" id="v-gain"></span></label>
@@ -484,14 +484,16 @@ function clarity(g, w, h, amount) {
   }
 }
 /* Punktzuwachs ausgleichen: Thermopunkte laufen breiter, als sie berechnet sind.
-   Modell: tatsächliche Deckung = a + 4·D·a·(1−a), D = Zuwachs bei 50 % Grau. Die Kurve rechnet das vorher heraus. */
+   Modell: tatsächliche Deckung = 1 − (1 − a)^p, mit p so gewählt, dass 50 % Grau als 50 % + D druckt.
+   Die Kurve ist für jedes D von Weiß bis Schwarz monoton; vorher wird ihre Umkehrung angewendet. */
 const gainLuts = {};
 function dotGainLut(D) {
   if (gainLuts[D]) return gainLuts[D];
   const lut = new Float32Array(256);
   for (let v = 0; v < 256; v++) {
     const c = 1 - v / 255;
-    const a = D <= 0 ? c : ((1 + 4 * D) - Math.sqrt((1 + 4 * D) ** 2 - 16 * D * c)) / (8 * D);
+    const p = Math.log(.5 - Math.min(D, .45)) / Math.log(.5);
+    const a = D <= 0 ? c : 1 - Math.pow(1 - c, 1 / p);
     lut[v] = 255 * (1 - a);
   }
   return gainLuts[D] = lut;
@@ -1052,11 +1054,12 @@ async function shoot() {
 
 /* Kalibrierstreifen: dieselben Graustufen und ein Bildausschnitt mit fünf Stufen der Punktzuwachs-Korrektur.
    Auf Papier sieht man, bei welcher Stufe die Treppe gleichmäßig von Weiß nach Schwarz läuft. */
-const GAIN_STEPS = [0, 10, 20, 30, 40];
+/* Drei Stufen rund um den aktuellen Wert, z. B. 10, 20 und 25 % */
+const gainSteps = () => [...new Set([S.gain - 10, S.gain, S.gain + 5].map(v => Math.max(0, Math.min(40, v))))];
 function calibrationPage() {
   const W = HEAD_WIDTH, s = source(), blocks = [];
   const patchH = 44, rampH = 36, photoH = 176, labelH = 34, gap = 22, headH = 70;
-  for (const D of GAIN_STEPS) {
+  for (const D of gainSteps()) {
     const g = new Float32Array(W * patchH);
     for (let y = 0; y < patchH; y++) for (let x = 0; x < W; x++) g[y * W + x] = 255 * (1 - Math.min(10, Math.floor(x / (W / 11))) / 10);
     const ramp = new Float32Array(W * rampH);
