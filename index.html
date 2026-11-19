@@ -393,12 +393,14 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
 <script>
 "use strict";
 /* ---------- Einstellungen ---------- */
-const DEFAULTS = { format: "screen", dither: "atkinson", bright: 110, dark: 95, frame: true, date: true, caption: "", rotate: false, compare: false, feed: 5, sound: true, sharp: 50, torchBright: 80, gain: 20, clarity: 30, speed: 36, fullres: true, pairs: false };
+const DEFAULTS = { format: "screen", dither: "stucki", bright: 110, dark: 95, frame: true, date: true, caption: "", rotate: false, compare: false, feed: 5, sound: true, sharp: 50, torchBright: 80, gain: 20, clarity: 30, speed: 36, fullres: true, pairs: false };
 const S = { ...DEFAULTS };
 try { Object.assign(S, JSON.parse(localStorage.getItem("sofortbild") || "{}")); } catch (e) {}
 if (!S.v2) { S.format = "screen"; S.feed = DEFAULTS.feed; S.v2 = 1; }
 if (!S.v3) { S.dark = 95; S.v3 = 1; }
 const save = () => { try { localStorage.setItem("sofortbild", JSON.stringify(S)); } catch (e) {} };
+/* Abstimmung nach dem Kalibrierstreifen vom 20.11.: Stucki ohne Paare, 10 % Punktzuwachs, langsameres Tempo gegen Streifen */
+if (!S.v4) { S.dither = "stucki"; S.pairs = false; S.gain = 10; S.speed = 44; S.v4 = 1; save(); }
 
 /* ---------- Bildverarbeitung ---------- */
 const HEAD_WIDTH = 384;
