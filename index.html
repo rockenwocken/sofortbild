@@ -345,7 +345,7 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
     <hr>
     <div class="field">
       <button class="btn" id="calib" type="button" style="display:inline-block;justify-self:start">Kalibrierstreifen drucken</button>
-      <small>Druckt Graustufen und einen Bildausschnitt mit drei Stufen Punktzuwachs rund um den aktuellen Wert. Wähle danach die Stufe, deren Treppe am gleichmäßigsten von Weiß nach Schwarz läuft.</small>
+      <small>Druckt für drei Stufen Punktzuwachs rund um den aktuellen Wert jeweils Graustufen und einen Bildausschnitt, verglichen in Atkinson, Stucki, Blue Noise und Stucki mit Punktpaaren. Wähle danach die Stufe, deren Treppe am gleichmäßigsten von Weiß nach Schwarz läuft.</small>
     </div>
     <div class="field">
       <label for="s-gain">Punktzuwachs ausgleichen <span class="val" id="v-gain"></span></label>
@@ -609,9 +609,9 @@ function prep(g, w, h, o = {}) {
   dotGain(g, (o.gain != null ? o.gain : S.gain) / 100);
   return g;
 }
-function finish(g, w, h, kind = S.dither) {
+function finish(g, w, h, kind = S.dither, pairs = S.pairs) {
   const bits = dither(g, w, h, kind);
-  if (S.pairs && kind !== "bayer") pairDots(bits, w, h, false);
+  if (pairs && kind !== "bayer") pairDots(bits, w, h, false);
   return bits;
 }
 function process(g, w, h, o = {}) { return finish(prep(g, w, h, o), w, h, o.kind || S.dither); }
@@ -1056,36 +1056,57 @@ async function shoot() {
    Auf Papier sieht man, bei welcher Stufe die Treppe gleichmäßig von Weiß nach Schwarz läuft. */
 /* Drei Stufen rund um den aktuellen Wert, z. B. 10, 20 und 25 % */
 const gainSteps = () => [...new Set([S.gain - 10, S.gain, S.gain + 5].map(v => Math.max(0, Math.min(40, v))))];
+/* Varianten im Kalibrierstreifen: jede Stufe zeigt Graustufen-Treppen und ein geteiltes Foto für alle vier */
+const CALIB_VARIANTS = [
+  { kind: "atkinson", pairs: false, name: "Atkinson" },
+  { kind: "stucki", pairs: false, name: "Stucki" },
+  { kind: "blue", pairs: false, name: "Blue Noise" },
+  { kind: "stucki", pairs: true, name: "Stucki + Paare" }
+];
 function calibrationPage() {
-  const W = HEAD_WIDTH, s = source(), blocks = [];
-  const patchH = 44, rampH = 36, photoH = 176, labelH = 34, gap = 22, headH = 70;
-  for (const D of gainSteps()) {
-    const g = new Float32Array(W * patchH);
-    for (let y = 0; y < patchH; y++) for (let x = 0; x < W; x++) g[y * W + x] = 255 * (1 - Math.min(10, Math.floor(x / (W / 11))) / 10);
-    const ramp = new Float32Array(W * rampH);
-    for (let y = 0; y < rampH; y++) for (let x = 0; x < W; x++) ramp[y * W + x] = 255 * (1 - x / (W - 1));
-    const photo = grayCover(s.src, s.w, s.h, W, photoH, s.mirror, true);
-    blocks.push({ D, patches: process(g, W, patchH, { raw: true, gain: D }), ramp: process(ramp, W, rampH, { raw: true, gain: D }), photo: process(photo, W, photoH, { gain: D }) });
-  }
-  const H = headH + blocks.length * (labelH + 12 + patchH + 4 + rampH + 4 + photoH + gap) + TEAR_LINES();
+  const W = HEAD_WIDTH, s = source(), V = CALIB_VARIANTS, n = V.length;
+  const patchH = 30, rowLabel = 14, photoH = 176, labelH = 30, numH = 14, gap = 24, headH = 70, photoLabel = 16;
+  const blockH = labelH + numH + n * (rowLabel + patchH + 2) + 4 + photoLabel + photoH + gap;
+  const H = headH + gainSteps().length * blockH + TEAR_LINES();
   const c = document.createElement("canvas"); c.width = W; c.height = H;
   const x = c.getContext("2d", { willReadFrequently: true });
   x.fillStyle = "#fff"; x.fillRect(0, 0, W, H); x.fillStyle = "#000"; x.textBaseline = "top";
   x.font = `700 24px ${FONT}`; x.fillText("Kalibrierung", 8, 8);
   x.font = `600 17px ${FONT}`;
-  x.fillText(`Stärke ${S.dark} % · Tempo ${S.speed} · ${DITHER_NAMES[S.dither]}`, 8, 38, W - 16);
+  x.fillText(`Stärke ${S.dark} % · Tempo ${S.speed}`, 8, 38, W - 16);
+  const edge = j => Math.round(j * W / n);
   let y = headH;
-  for (const b of blocks) {
-    x.font = `700 20px ${FONT}`; x.fillText(`Punktzuwachs ${b.D} %${b.D === S.gain ? "  ◀ aktuell" : ""}`, 8, y + 6, W - 16);
+  for (const D of gainSteps()) {
+    x.font = `700 20px ${FONT}`; x.fillText(`Punktzuwachs ${D} %${D === S.gain ? "  ◀ aktuell" : ""}`, 8, y + 4, W - 16);
     y += labelH;
     x.font = `600 12px ${FONT}`; x.textAlign = "center";
-    for (let k = 0; k <= 10; k++) x.fillText(String(k * 10), (k + .5) * W / 11, y - 2);
-    x.textAlign = "left"; y += 12;
-    paintBits(x, b.patches, W, patchH, 0, y);
-    x.fillStyle = "#fff"; for (let k = 1; k <= 10; k++) x.fillRect(Math.round(k * W / 11) - 1, y, 2, patchH); x.fillStyle = "#000";
-    y += patchH + 4;
-    paintBits(x, b.ramp, W, rampH, 0, y); y += rampH + 4;
-    paintBits(x, b.photo, W, photoH, 0, y); y += photoH + gap;
+    for (let k = 0; k <= 10; k++) x.fillText(String(k * 10), (k + .5) * W / 11, y);
+    x.textAlign = "left"; y += numH;
+    /* Graustufen-Treppe, für jede Variante eine Zeile */
+    const patches = new Float32Array(W * patchH);
+    for (let yy = 0; yy < patchH; yy++) for (let xx = 0; xx < W; xx++) patches[yy * W + xx] = 255 * (1 - Math.min(10, Math.floor(xx / (W / 11))) / 10);
+    const pg = prep(patches, W, patchH, { raw: true, gain: D });
+    for (const v of V) {
+      x.font = `600 12px ${FONT}`; x.fillText(v.name, 4, y + 1);
+      y += rowLabel;
+      paintBits(x, finish(pg.slice(), W, patchH, v.kind, v.pairs), W, patchH, 0, y);
+      x.fillStyle = "#fff"; for (let k = 1; k <= 10; k++) x.fillRect(Math.round(k * W / 11) - 1, y, 2, patchH); x.fillStyle = "#000";
+      y += patchH + 2;
+    }
+    y += 4;
+    /* Foto als Teststreifen: ein senkrechter Streifen pro Variante */
+    x.font = `600 11px ${FONT}`; x.textAlign = "center";
+    V.forEach((v, j) => x.fillText(v.name, (edge(j) + edge(j + 1)) / 2, y + 2, edge(j + 1) - edge(j) - 4));
+    x.textAlign = "left"; y += photoLabel;
+    const base = prep(grayCover(s.src, s.w, s.h, W, photoH, s.mirror, true), W, photoH, { gain: D });
+    const photo = new Uint8Array(W * photoH);
+    V.forEach((v, j) => {
+      const full = finish(base.slice(), W, photoH, v.kind, v.pairs), x0 = edge(j), x1 = edge(j + 1);
+      for (let yy = 0; yy < photoH; yy++) photo.set(full.subarray(yy * W + x0, yy * W + x1), yy * W + x0);
+    });
+    for (let j = 1; j < n; j++) for (let yy = 0; yy < photoH; yy++) { photo[yy * W + edge(j) - 1] = 0; photo[yy * W + edge(j)] = 0; }
+    paintBits(x, photo, W, photoH, 0, y);
+    y += photoH + gap;
   }
   const d = x.getImageData(0, 0, W, H).data, bits = new Uint8Array(W * H);
   for (let i = 0; i < bits.length; i++) bits[i] = d[i * 4 + 1] < 128 ? 1 : 0;
