@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Sofortbild</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Shrikhand&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Jost:wght@400;500;600;700&family=Shrikhand&family=Oswald:wght@500;700&display=swap">
 <style>
 /* Layout: randloser Sucher über den ganzen Bildschirm, nur der Auslöser bleibt sichtbar.
    Nach oben wischen: Stufe 1 zeigt drei Werkzeuge, Stufe 2 schiebt die Einstellungen als Lisa-Fenster herein. */
@@ -676,7 +676,8 @@ function comparePage(src, sw, sh, mirror) {
    Der Abreißkante liegt ein Stück hinter dem Druckkopf, daher der Grundvorschub plus einstellbarer Rest. */
 const BASE_FEED = 70;
 const TEAR_LINES = () => BASE_FEED + S.feed * 8;
-const FONT = '"Pixelify Sans", monospace';
+/* Schrift für alles Gedruckte und das Polaroid: Jost, eine freie Schrift im Stil der Futura */
+const FONT = '"Jost", "Futura", "Century Gothic", sans-serif';
 function composePage(p, now = new Date(), label = "", tear = TEAR_LINES(), frame = S.frame) {
   const c = document.createElement("canvas"), m = frame ? 16 : 0;
   const stamp = S.date ? now.toLocaleDateString("de-DE") + "  " + now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "";
@@ -1507,7 +1508,7 @@ $("aj-print").addEventListener("click", () => { if (ajFrames.length === 4) runPr
 window.Sofortbild = { printer, crc8, cmd, packPage, composePage, dither };
 updateStatus(); keepAwake(); requestAnimationFrame(loop);
 /* Schrift für den Drucktext vorab laden, sonst druckt Canvas mit Ersatzschrift */
-if (document.fonts) document.fonts.load(`700 30px ${FONT}`).catch(() => {});
+if (document.fonts) for (const w of [400, 600, 700]) document.fonts.load(`${w} 20px ${FONT}`).catch(() => {});
 if (!canBluetooth()) hint(NO_BT);
 </script>
 </body>
