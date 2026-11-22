@@ -417,7 +417,7 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
 <script>
 "use strict";
 /* ---------- Einstellungen ---------- */
-const DEFAULTS = { format: "screen", dither: "stucki", bright: 100, dark: 95, frame: true, date: true, caption: "", rotate: false, compare: false, feed: 5, sound: true, sharp: 50, torchBright: 80, curve: 30, gain: 5, clarity: 30, speed: 36, fullres: true, pairs: false };
+const DEFAULTS = { format: "screen", dither: "stucki", bright: 100, dark: 95, frame: true, date: true, caption: "", rotate: false, compare: false, feed: 5, sound: true, sharp: 50, torchBright: 80, curve: 30, gain: 25, clarity: 30, speed: 36, fullres: true, pairs: false };
 const S = { ...DEFAULTS };
 try { Object.assign(S, JSON.parse(localStorage.getItem("sofortbild") || "{}")); } catch (e) {}
 if (!S.v2) { S.format = "screen"; S.feed = DEFAULTS.feed; S.v2 = 1; }
@@ -431,6 +431,8 @@ if (!S.v5) { S.gain = 0; S.bright = 100; S.v5 = 1; save(); }
 if (!S.v6) { S.dark = 95; S.curve = 30; S.v6 = 1; save(); }
 /* Bei 95 % Stärke laufen die Punkte breiter: 5 % Ausgleich */
 if (!S.v7) { S.gain = 5; S.v7 = 1; save(); }
+/* Neues Papier (12 Rollen, 57 × 30 mm) reagiert empfindlicher: mehr Punktzuwachs-Ausgleich */
+if (!S.v8) { S.gain = 25; S.dither = "stucki"; S.pairs = false; S.v8 = 1; save(); }
 
 /* ---------- Bildverarbeitung ---------- */
 const HEAD_WIDTH = 384;
