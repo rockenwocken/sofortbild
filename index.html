@@ -1520,11 +1520,12 @@ $("aj-again").addEventListener("click", () => ajMode("camera"));
 
 /* Druck: vier Bilder ohne Abstand untereinander als ein durchgehender Streifen */
 /* Druckformate für die vier Bilder (Breite × Höhe je Bild in Druckpunkten, 8 Punkte = 1 mm):
-   Filmstreifen: hochkant 3:4 untereinander, schmal und mittig wie ein Filmstreifen (Bilder ca. 10 cm)
+   Filmstreifen: Bilder um 90° im Uhrzeigersinn gedreht, lange Seite über die volle Papierbreite,
+                 untereinander ohne Abstand (je 3,6 cm, zusammen ca. 14,4 cm)
    2 × 2: hochkant 3:4 in halber Breite (ca. 6,4 cm)
    Nebeneinander: vier schmale Bilder in einer Reihe, höher zugeschnitten (ca. 2,8 cm) */
 const AJ_LAYOUTS = {
-  film: { fw: 150, fh: 200, pos: i => [117, i * 200], w: 384, h: 800 },
+  film: { fw: 384, fh: 288, rotate: true, pos: i => [0, i * 288], w: 384, h: 1152 },
   grid: { fw: 192, fh: 256, pos: i => [(i % 2) * 192, Math.floor(i / 2) * 256], w: 384, h: 512 },
   row:  { fw: 96, fh: 224, pos: i => [i * 96, 0], w: 384, h: 224 }
 };
@@ -1533,7 +1534,12 @@ function ajStripPage(layout = S.ajLayout) {
   const L = AJ_LAYOUTS[layout], { fw, fh } = L;
   /* Alle vier Bilder gemeinsam abstimmen und rastern, damit sie gleich hell wirken */
   const g = new Float32Array(fw * fh * 4);
-  ajFrames.forEach((f, i) => g.set(grayCover(f, f.width, f.height, fw, fh, false, true), i * fw * fh));
+  ajFrames.forEach((f, i) => {
+    if (!L.rotate) return g.set(grayCover(f, f.width, f.height, fw, fh, false, true), i * fw * fh);
+    /* Hochkant zuschneiden (fh breit, fw hoch) und im Uhrzeigersinn drehen: die Bildoberkante liegt rechts */
+    const o = grayCover(f, f.width, f.height, fh, fw, false, true), base = i * fw * fh;
+    for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) g[base + y * fw + x] = o[(fw - 1 - x) * fh + y];
+  });
   /* Gleiche Bildstrecke wie Coolaroid; mit Lampe auch der Licht-Ausgleich */
   const strip = process(g, fw, fh * 4, { lit: ajLit });
   const bits = new Uint8Array(L.w * L.h);
