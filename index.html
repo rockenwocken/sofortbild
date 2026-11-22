@@ -104,6 +104,8 @@ details summary { font-weight: 600; cursor: pointer; min-height: 30px; }
 #sheet canvas { display: block; width: 100%; image-rendering: pixelated; }
 #tray.out #sheet { transition: transform var(--eject, 3s) linear; transform: translateY(var(--sheet-y, 16px)); }
 @media (prefers-reduced-motion: reduce) { #tray.out #sheet, #panel, #dock, .tools { transition: none; } #flash.go { animation: none; } }
+/* Bildschirmblitz für die Frontkamera: der ganze Bildschirm leuchtet warmweiß */
+#screenflash { position: fixed; inset: 0; z-index: 50; background: #fffaf0; pointer-events: none; }
 /* ===== Startbildschirm und Ansichten ===== */
 body:not([data-view="cool"]) :is(#finder, #dock, #panel, #tray) { display: none !important; }
 body:not([data-view="home"]) #home { display: none !important; }
@@ -288,6 +290,7 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
   <canvas id="vf" width="384" height="800" aria-label="Sucher mit Druckvorschau"></canvas>
   <div id="flash"></div>
 </div>
+<div id="screenflash" hidden></div>
 <div class="alert" id="hintbox" hidden><b>!</b><span id="hint"></span></div>
 
 <div id="dock">
@@ -336,6 +339,14 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
         <option value="wide">Querformat 4:3</option>
       </select>
     </div>
+    <label class="check"><input id="s-sound" type="checkbox"><span>Auslösegeräusch<small>Spielt über die Medienlautstärke.</small></span></label>
+    <hr>
+    <div class="field">
+      <button class="btn" id="calib" type="button" style="display:inline-block;justify-self:start">Kalibrierstreifen drucken</button>
+      <small>Vergleicht nebeneinander drei Stufen Punktzuwachs rund um den aktuellen Wert und vier Punktmuster, jeweils mit Graustufen-Treppe und demselben Bildausschnitt. Nebeneinander, damit die Erwärmung des Druckkopfs den Vergleich nicht verfälscht. Wähle danach die Stufe, deren Treppe am gleichmäßigsten von Weiß nach Schwarz läuft.</small>
+    </div>
+    <!-- Druckfeinheiten: werden über den Kalibrierstreifen abgestimmt und sind in der Oberfläche ausgeblendet -->
+    <div id="expert" hidden>
     <div class="field">
       <label for="s-dither">Punktmuster</label>
       <select id="s-dither">
@@ -360,11 +371,6 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
       <label for="s-feed">Papiervorschub am Ende <span class="val" id="v-feed"></span></label>
       <input id="s-feed" type="range" min="0" max="30" step="1">
       <small>Leeres Papier nach dem Text, damit beim Abreißen nichts abgeschnitten wird.</small>
-    </div>
-    <hr>
-    <div class="field">
-      <button class="btn" id="calib" type="button" style="display:inline-block;justify-self:start">Kalibrierstreifen drucken</button>
-      <small>Vergleicht nebeneinander drei Stufen Punktzuwachs rund um den aktuellen Wert und vier Punktmuster, jeweils mit Graustufen-Treppe und demselben Bildausschnitt. Nebeneinander, damit die Erwärmung des Druckkopfs den Vergleich nicht verfälscht. Wähle danach die Stufe, deren Treppe am gleichmäßigsten von Weiß nach Schwarz läuft.</small>
     </div>
     <div class="field">
       <label for="s-gain">Punktzuwachs ausgleichen <span class="val" id="v-gain"></span></label>
@@ -398,8 +404,8 @@ body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
       <input id="s-torchBright" type="range" min="50" max="110" step="5">
       <small>Bei eingeschalteter Lampe wird das Bild so viel dunkler und kontrastreicher.</small>
     </div>
-    <label class="check"><input id="s-sound" type="checkbox"><span>Auslösegeräusch<small>Spielt über die Medienlautstärke.</small></span></label>
     <label class="check"><input id="s-rotate" type="checkbox"><span>Druck um 180° drehen<small>Einschalten, falls das Foto auf dem Kopf aus dem Drucker kommt.</small></span></label>
+    </div>
     <hr>
     <details>
       <summary>Diagnose für die Fehlersuche</summary>
@@ -866,7 +872,7 @@ let torchOn = false;
 const track = () => stream && stream.getVideoTracks()[0];
 const hasTorch = t => { try { return !!(t && t.getCapabilities && t.getCapabilities().torch); } catch (e) { return false; } };
 function setupTorch() {
-  torchOn = false; $("torch").setAttribute("aria-pressed", "false");
+  torchOn = false; showLight();
   const t = track();
   printer.log(`Kamera: ${t ? t.label : "-"} · Lampe ${hasTorch(t) ? "ja" : "nein"}`);
 }
@@ -899,7 +905,7 @@ async function setTorch(on) {
   if (window.ImageCapture) { try { await new ImageCapture(t).getPhotoCapabilities(); } catch (e) {} }
   try { await t.applyConstraints({ advanced: [{ torch: on }] }); }
   catch (e) { await t.applyConstraints({ torch: on }); }
-  torchOn = on; $("torch").setAttribute("aria-pressed", String(on));
+  torchOn = on; showLight();
   tuneCamera(on);
 }
 async function findTorchCamera() {
@@ -919,9 +925,19 @@ async function findTorchCamera() {
   }
   return null;
 }
+/* Frontkamera: statt Lampe ein Bildschirmblitz, der beim Auslösen den Bildschirm weiß aufleuchten lässt */
+let screenFlash = false;
+const lightOn = () => facing === "user" ? screenFlash : torchOn;
+function showLight() { $("torch").setAttribute("aria-pressed", String(lightOn())); }
+/* Bildschirm weiß, kurz warten, damit die Kamera die Belichtung anpasst, dann aufnehmen */
+async function withScreenFlash(fn) {
+  if (facing !== "user" || !screenFlash) return fn();
+  const el = $("screenflash"); el.hidden = false;
+  try { await sleep(650); return await fn(); } finally { el.hidden = true; }
+}
 async function toggleTorch() {
+  if (facing === "user") { screenFlash = !screenFlash; showLight(); hint(""); return; }
   if (!track()) return hint("Die Kamera läuft nicht, deshalb kann die Lampe nicht angehen.");
-  if (facing === "user") return hint("Die Frontkamera hat keine Lampe. Wechsle mit „Wenden“ zur Rückkamera.");
   $("torch").disabled = true;
   try {
     if (!hasTorch(track())) await sleep(500);
@@ -1089,7 +1105,7 @@ async function shoot() {
   if (navigator.vibrate) navigator.vibrate(30);
   lastTime = new Date();
   let s;
-  try { s = await capture(); } finally { shooting = false; }
+  try { s = await withScreenFlash(capture); } finally { shooting = false; }
   if (S.compare) {
     lastPage = comparePage(s.src, s.w, s.h, s.mirror);
     lastPhoto = photoBits(s.src, s.w, s.h, s.mirror, S.dither, true);
@@ -1343,7 +1359,7 @@ let ajLit = false, ajFrames = [], ajRunning = false, ajAnimTimer = null, ajTime 
 function ajMode(m) { document.body.dataset.aj = m; if (m !== "result") clearInterval(ajAnimTimer); }
 function syncSwitches() {
   $("aj-cam").setAttribute("aria-pressed", String(facing === "user"));
-  $("aj-light").setAttribute("aria-pressed", String(torchOn));
+  $("aj-light").setAttribute("aria-pressed", String(lightOn()));
   $("ajgate").classList.toggle("mirror", facing === "user");
 }
 function showInterval() {
@@ -1421,6 +1437,8 @@ async function ajShoot() {
       await sleep(1000);
     }
     count.hidden = true;
+    /* Frontkamera mit Blitz: Bildschirm bleibt für alle vier Bilder weiß */
+    if (facing === "user" && screenFlash) { $("screenflash").hidden = false; await sleep(650); }
     ajFrames = []; ajTime = new Date(); ajLit = torchOn;
     $("ajrec").hidden = false;
     for (let i = 0; i < 4; i++) {
@@ -1434,7 +1452,7 @@ async function ajShoot() {
     await sleep(350);
     $("ajrec").hidden = true; $("ajframe").hidden = true;
     ajShowResult();
-  } finally { ajRunning = false; $("aj-shutter").disabled = false; }
+  } finally { $("screenflash").hidden = true; ajRunning = false; $("aj-shutter").disabled = false; }
 }
 $("aj-shutter").addEventListener("click", ajShoot);
 
