@@ -110,8 +110,9 @@ details summary { font-weight: 600; cursor: pointer; min-height: 30px; }
 body:not([data-view="cool"]) :is(#finder, #dock, #panel, #tray) { display: none !important; }
 body:not([data-view="home"]) #home { display: none !important; }
 body:not([data-view="action"]) #action { display: none !important; }
+body:not([data-view="topo"]) #topo { display: none !important; }
 
-#home { position: fixed; inset: 0; display: grid; grid-template-rows: 1fr 1fr; z-index: 10; }
+#home { position: fixed; inset: 0; display: grid; grid-template-rows: 1fr 1fr 1fr; z-index: 10; }
 .pick { border: 0; padding: 0; margin: 0; display: grid; place-items: center; position: relative; overflow: hidden; }
 .pick-cool { background: var(--white) repeating-conic-gradient(var(--black) 0 25%, var(--white) 0 50%) 0 0 / 2px 2px; padding-top: env(safe-area-inset-top, 0px); }
 .pick-cool .win { background: var(--white); border: 2px solid var(--black); box-shadow: 4px 4px 0 var(--black); width: min(76vw, 300px); }
@@ -122,6 +123,15 @@ body:not([data-view="action"]) #action { display: none !important; }
   background: linear-gradient(var(--aj-mustard) 0 33.3%, var(--aj-orange) 0 66.6%, var(--aj-brown) 0); }
 .pick-action b { position: relative; font: 400 clamp(44px, 14vw, 64px)/1 var(--aj-display); color: var(--aj-cream); text-shadow: 3px 3px 0 var(--aj-brown), 5px 5px 0 var(--aj-orange); transform: rotate(-8deg); }
 .pick-action small { position: absolute; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); font: 500 13px var(--aj-label); letter-spacing: .2em; text-transform: uppercase; color: var(--aj-brown); }
+.pick-topo { background: var(--tp-paper); color: var(--tp-ink); padding-bottom: env(safe-area-inset-bottom, 0px); font-family: var(--tp-font); }
+.pick-topo .shapes { position: absolute; inset: 0; pointer-events: none; }
+.pick-topo .c { position: absolute; width: 38%; aspect-ratio: 1; border-radius: 50%; background: var(--tp-red); right: -6%; top: -18%; }
+.pick-topo .q { position: absolute; width: 15%; aspect-ratio: 1; background: var(--tp-blue); right: 40%; bottom: 12%; }
+.pick-topo .t { position: absolute; width: 0; height: 0; right: 27%; bottom: 12%; border-left: 34px solid transparent; border-right: 34px solid transparent; border-bottom: 58px solid var(--tp-yellow); }
+.pick-topo .rings { position: absolute; right: 4%; bottom: 8%; width: 92px; aspect-ratio: 1; border-radius: 50%;
+  background: repeating-radial-gradient(circle, var(--tp-ink) 0 2px, transparent 2px 9px); }
+.pick-topo b { position: relative; align-self: start; margin-top: 7%; font: 700 clamp(40px, 12vw, 56px)/.9 var(--tp-font); letter-spacing: .04em; text-transform: uppercase; justify-self: start; margin-left: 8%; }
+.pick-topo small { position: absolute; left: 8%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font: 500 12px var(--tp-font); letter-spacing: .25em; text-transform: uppercase; display: none; }
 .pick:focus-visible { outline: 3px dashed var(--black); outline-offset: -8px; }
 
 /* ===== Action Jackson: Super-8-Kamera aus den 70ern ===== */
@@ -219,12 +229,86 @@ body[data-view="action"][data-aj="result"] :is(.aj-gate, .aj-deck) { display: no
 body[data-view="action"]:not([data-aj="result"]) #ajresult { display: none; }
 @media (prefers-reduced-motion: reduce) { .aj-gate::after, .aj-rec { animation: none; } }
 
+/* ===== Topo Popo: Bauhaus ===== */
+:root { --tp-paper: #f1ece2; --tp-ink: #141414; --tp-red: #d3312a; --tp-yellow: #f0b323; --tp-blue: #1e4f9c;
+  --tp-font: "Jost", "Futura", "Century Gothic", sans-serif; }
+#topo { position: fixed; inset: 0; z-index: 10; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--tp-paper); color: var(--tp-ink); font-family: var(--tp-font); touch-action: none; }
+.tp-top { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; border-bottom: 4px solid var(--tp-ink);
+  padding: calc(10px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); }
+.tp-logo { font: 700 26px/1 var(--tp-font); letter-spacing: .08em; text-transform: uppercase; }
+.tp-marks { display: flex; gap: 6px; align-items: center; justify-self: end; }
+.tp-marks i { display: block; width: 16px; height: 16px; }
+.tp-marks .c { border-radius: 50%; background: var(--tp-red); }
+.tp-marks .q { background: var(--tp-blue); }
+.tp-marks .t { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 16px solid var(--tp-yellow); }
+.tp-home { width: 36px; height: 36px; border: 3px solid var(--tp-ink); background: none; border-radius: 0; font: 700 18px var(--tp-font); padding: 0; color: var(--tp-ink); }
+.tp-stage { position: relative; min-height: 0; display: grid; place-items: center; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); }
+.tp-frame { position: relative; height: 100%; max-height: 100%; aspect-ratio: 3 / 4; max-width: 100%; border: 4px solid var(--tp-ink); background: #fff; overflow: hidden; }
+.tp-frame video, .tp-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tp-frame video { filter: grayscale(1) contrast(1.15); }
+.tp-frame.mirror video { transform: scaleX(-1); }
+.tp-frame canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; }
+.tp-pin { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 3px solid var(--tp-red); background: var(--tp-paper); pointer-events: none; }
+.tp-busy { position: absolute; inset: auto 0 0; background: var(--tp-ink); color: var(--tp-paper); font: 600 13px var(--tp-font); letter-spacing: .2em; text-transform: uppercase; padding: 6px 10px; }
+.tp-deck { border-top: 4px solid var(--tp-ink); display: grid; gap: 14px;
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.tp-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; justify-items: center; }
+.tp-btn { border: 0; padding: 0; display: grid; place-items: center; gap: 6px; background: none; color: var(--tp-ink); font: 600 11px var(--tp-font); letter-spacing: .2em; text-transform: uppercase; }
+.tp-btn .q { width: 46px; height: 46px; background: var(--tp-blue); }
+.tp-btn .t { width: 0; height: 0; border-left: 26px solid transparent; border-right: 26px solid transparent; border-bottom: 46px solid var(--tp-yellow); }
+.tp-btn[aria-pressed="true"] .t { border-bottom-color: var(--tp-ink); }
+.tp-shutter { width: 86px; height: 86px; border-radius: 50%; border: 4px solid var(--tp-ink); background: var(--tp-red); box-shadow: inset 0 0 0 8px var(--tp-paper); padding: 0; }
+.tp-shutter:active { background: var(--tp-ink); }
+.tp-shutter[disabled] { opacity: .5; }
+.tp-slider { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; font: 600 11px var(--tp-font); letter-spacing: .18em; text-transform: uppercase; }
+.tp-slider input { width: 100%; height: 34px; accent-color: var(--tp-red); touch-action: pan-x; }
+.tp-slider output { font: 700 16px var(--tp-font); letter-spacing: 0; min-width: 2.5em; text-align: right; font-variant-numeric: tabular-nums; }
+.tp-hint { font: 400 13px var(--tp-font); text-align: center; margin: -6px 0 0; }
+.tp-actions { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 10px; }
+.tp-act { min-height: 50px; border: 3px solid var(--tp-ink); border-radius: 0; background: var(--tp-paper); color: var(--tp-ink); font: 700 14px var(--tp-font); letter-spacing: .12em; text-transform: uppercase; }
+.tp-act.blue { background: var(--tp-blue); color: var(--tp-paper); border-color: var(--tp-blue); }
+.tp-act.red { background: var(--tp-red); color: var(--tp-paper); border-color: var(--tp-red); }
+.tp-act:active { transform: translate(2px, 2px); }
+.tp-act[disabled] { opacity: .55; }
+body[data-view="topo"][data-tp="edit"] .tp-cam { display: none !important; }
+body[data-view="topo"]:not([data-tp="edit"]) .tp-edit { display: none !important; }
+
 </style>
 </head>
 <body data-level="0" data-view="home">
 <div id="home">
   <button class="pick pick-cool" id="go-cool" type="button"><span class="win"><span class="titlebar"><span>Sofortbild</span></span><b>Coolaroid</b><small>Ein Foto, sofort gedruckt.</small></span></button>
   <button class="pick pick-action" id="go-action" type="button"><span class="stripes"></span><b>Action Jackson</b><small>4 Bilder · Super-8-Streifen</small></button>
+  <button class="pick pick-topo" id="go-topo" type="button"><span class="shapes"><span class="c"></span><span class="q"></span><span class="t"></span><span class="rings"></span></span><b>Topo<br>Popo</b></button>
+</div>
+
+<div id="topo">
+  <header class="tp-top">
+    <button class="tp-home" id="tp-home" type="button" aria-label="Zurück zur Auswahl">‹</button>
+    <span class="tp-logo">Topo Popo</span>
+    <span class="tp-marks" aria-hidden="true"><i class="c"></i><i class="q"></i><i class="t"></i></span>
+  </header>
+  <div class="tp-stage">
+    <div class="tp-frame" id="tpframe">
+      <canvas id="tp-canvas" class="tp-edit" width="384" height="512" aria-label="Höhenlinienbild. Tippen setzt den Startpunkt."></canvas>
+      <span class="tp-pin tp-edit" id="tp-pin"></span>
+      <div class="tp-busy" id="tp-busy" hidden>Rechne …</div>
+    </div>
+  </div>
+  <div class="tp-deck">
+    <div class="tp-row tp-cam">
+      <button class="tp-btn" id="tp-flip" type="button"><span class="q"></span>Wenden</button>
+      <button class="tp-shutter" id="tp-shutter" type="button" aria-label="Foto aufnehmen"></button>
+      <button class="tp-btn" id="tp-light" type="button" aria-pressed="false"><span class="t"></span>Licht</button>
+    </div>
+    <div class="tp-slider tp-edit"><label for="tp-gap">Abstand</label><input id="tp-gap" type="range" min="2" max="14" step="0.5"><output id="tp-gap-v"></output></div>
+    <p class="tp-hint tp-edit">Tipp ins Bild, um den Startpunkt der Linien zu setzen.</p>
+    <div class="tp-actions tp-edit">
+      <button class="tp-act" id="tp-again" type="button">Nochmal</button>
+      <button class="tp-act blue" id="tp-save" type="button">Speichern</button>
+      <button class="tp-act red" id="tp-print" type="button">Drucken</button>
+    </div>
+  </div>
 </div>
 
 <div id="action">
@@ -852,6 +936,8 @@ function updateStatus(text) {
   $("progress").hidden = !(busy && text);
   $("aj-print").textContent = busy ? (text ? text.replace("Druckt …", "Druckt") : "Verbinde …") : "Drucken";
   $("aj-print").disabled = busy;
+  $("tp-print").textContent = busy ? (text ? text.replace("Druckt …", "Druckt") : "Verbinde …") : "Drucken";
+  $("tp-print").disabled = busy;
   if (busy && text) $("progress").textContent = text;
 }
 printer.onchange = () => updateStatus();
@@ -1343,12 +1429,14 @@ function show(view) {
     return;
   }
   if (view === "action") { $("ajgate").prepend(video); ajMode("camera"); }
-  if (!stream) startCamera().then(syncSwitches);
+  if (view === "topo") { $("tpframe").prepend(video); tpMode("camera"); }
+  if (!stream) startCamera().then(() => { syncSwitches(); tpSync(); });
 }
-const route = () => show(location.hash === "#coolaroid" ? "cool" : location.hash === "#action" ? "action" : "home");
+const route = () => show({ "#coolaroid": "cool", "#action": "action", "#topo": "topo" }[location.hash] || "home");
 addEventListener("hashchange", route);
 if (location.hash) history.replaceState(null, "", location.pathname);
 $("go-cool").addEventListener("click", () => { location.hash = "coolaroid"; });
+$("go-topo").addEventListener("click", () => { location.hash = "topo"; });
 $("go-action").addEventListener("click", () => { location.hash = "action"; });
 $("aj-home").addEventListener("click", () => history.length > 1 ? history.back() : (location.hash = ""));
 
@@ -1578,6 +1666,140 @@ function ajShowLayout() {
 }
 document.querySelectorAll(".aj-layout").forEach(b => b.addEventListener("click", () => { S.ajLayout = b.dataset.layout; save(); ajShowLayout(); }));
 $("aj-print").addEventListener("click", () => { if (ajFrames.length === 4) runPrint(ajStripPage()); });
+
+/* ===================== Topo Popo ===================== */
+/* Höhenlinien nach der Fast-Marching-Methode: Von einem Startpunkt breitet sich eine Welle aus,
+   in hellen Bildteilen schnell, in dunklen langsam. Linien entstehen dort, wo die Welle zur gleichen
+   Zeit ankommt. In dunklen Bereichen liegen sie deshalb dicht, in hellen weit auseinander. */
+const TP_W = 384, TP_H = 512;
+let tpGray = null, tpTime = null, tpField = null, tpStart = { x: .5, y: .42 }, tpShotTime = null;
+if (!(S.tpGap >= 2 && S.tpGap <= 14)) S.tpGap = 6;
+function tpMode(m) { document.body.dataset.tp = m; }
+function tpSync() {
+  $("tp-light").setAttribute("aria-pressed", String(lightOn()));
+  $("tpframe").classList.toggle("mirror", facing === "user");
+}
+/* Ankunftszeiten per Fast Marching (Eikonal-Gleichung erster Ordnung, Binärheap) */
+function fastMarch(speed, w, h, sx, sy) {
+  const N = w * h, T = new Float32Array(N).fill(Infinity), done = new Uint8Array(N);
+  let hk = new Float32Array(1 << 16), hv = new Int32Array(1 << 16), n = 0;
+  const push = (k, v) => {
+    if (n >= hk.length) { const k2 = new Float32Array(hk.length * 2), v2 = new Int32Array(hk.length * 2); k2.set(hk); v2.set(hv); hk = k2; hv = v2; }
+    let i = n++;
+    while (i > 0) { const p = (i - 1) >> 1; if (hk[p] <= k) break; hk[i] = hk[p]; hv[i] = hv[p]; i = p; }
+    hk[i] = k; hv[i] = v;
+  };
+  const pop = () => {
+    const v = hv[0], k = hk[--n], x = hv[n]; let i = 0;
+    for (;;) { let c = 2 * i + 1; if (c >= n) break; if (c + 1 < n && hk[c + 1] < hk[c]) c++; if (hk[c] >= k) break; hk[i] = hk[c]; hv[i] = hv[c]; i = c; }
+    hk[i] = k; hv[i] = x; return v;
+  };
+  const s0 = sy * w + sx; T[s0] = 0; push(0, s0);
+  const update = i => {
+    if (done[i]) return;
+    const x = i % w, y = (i / w) | 0;
+    const a = Math.min(x > 0 ? T[i - 1] : Infinity, x < w - 1 ? T[i + 1] : Infinity);
+    const b = Math.min(y > 0 ? T[i - w] : Infinity, y < h - 1 ? T[i + w] : Infinity);
+    const f = 1 / speed[i];
+    let t;
+    if (!isFinite(a) || !isFinite(b) || Math.abs(a - b) >= f) t = Math.min(a, b) + f;
+    else t = (a + b + Math.sqrt(2 * f * f - (a - b) * (a - b))) / 2;
+    if (t < T[i]) { T[i] = t; push(t, i); }
+  };
+  while (n) {
+    const i = pop();
+    if (done[i]) continue;
+    done[i] = 1;
+    const x = i % w;
+    if (x > 0) update(i - 1); if (x < w - 1) update(i + 1);
+    if (i >= w) update(i - w); if (i < N - w) update(i + w);
+  }
+  return T;
+}
+/* Graustufen → Geschwindigkeit: Weiß = 1, Schwarz = fast 0 (dort stauen sich die Linien zu Schwarz) */
+function tpSpeed(g, w, h) {
+  const b = new Float32Array(g.length);
+  /* leicht weichzeichnen, damit die Linien nicht ausfransen */
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let sum = 0, c = 0;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if (xx >= 0 && xx < w && yy >= 0 && yy < h) { sum += g[yy * w + xx]; c++; }
+    }
+    b[y * w + x] = sum / c;
+  }
+  for (let i = 0; i < b.length; i++) b[i] = .14 + .86 * Math.min(1, Math.max(0, b[i] / 255));
+  return b;
+}
+function tpCompute() {
+  if (!tpGray) return;
+  const sx = Math.round(tpStart.x * (TP_W - 1)), sy = Math.round(tpStart.y * (TP_H - 1));
+  tpField = fastMarch(tpSpeed(tpGray, TP_W, TP_H), TP_W, TP_H, sx, sy);
+  tpDraw();
+}
+/* Linie dort, wo zwischen zwei Nachbarpunkten eine Höhenstufe überschritten wird */
+function tpBits() {
+  const T = tpField, w = TP_W, h = TP_H, gap = S.tpGap, bits = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, l = Math.floor(T[i] / gap);
+    if ((x < w - 1 && Math.floor(T[i + 1] / gap) !== l) || (y < h - 1 && Math.floor(T[i + w] / gap) !== l)) bits[i] = 1;
+  }
+  return bits;
+}
+function tpDraw() {
+  if (!tpField) return;
+  const c = $("tp-canvas"); paintBits(c.getContext("2d"), tpBits(), TP_W, TP_H);
+  const pin = $("tp-pin"); pin.style.left = tpStart.x * 100 + "%"; pin.style.top = tpStart.y * 100 + "%";
+  $("tp-gap").value = S.tpGap; $("tp-gap-v").textContent = String(S.tpGap).replace(".", ",");
+}
+async function tpShoot() {
+  $("tp-shutter").disabled = true;
+  try {
+    shutterSound();
+    if (navigator.vibrate) navigator.vibrate(30);
+    tpShotTime = new Date();
+    const f = await withScreenFlash(async () => grabFrame());
+    /* Tonwerte wie im Druck abstimmen (Helligkeit, Papierkontrast, Klarheit), aber ohne Punktmuster */
+    const g = grayCover(f, f.width, f.height, TP_W, TP_H, false, true);
+    tone(g, (S.bright / 100) * (torchOn ? S.torchBright / 100 : 1), torchOn ? .03 : .01);
+    sCurve(g, S.curve / 100);
+    clarity(g, TP_W, TP_H, (S.clarity / 100) * .9);
+    tpGray = g; tpStart = { x: .5, y: .42 };
+    tpMode("edit");
+    $("tp-busy").hidden = false;
+    await sleep(30);
+    tpCompute();
+  } finally { $("tp-busy").hidden = true; $("tp-shutter").disabled = false; }
+}
+$("tp-shutter").addEventListener("click", tpShoot);
+$("tp-flip").addEventListener("click", async () => { facing = facing === "user" ? "environment" : "user"; tpSync(); await startCamera(); tpSync(); });
+$("tp-light").addEventListener("click", async () => { await toggleTorch(); tpSync(); });
+$("tp-home").addEventListener("click", () => history.length > 1 ? history.back() : (location.hash = ""));
+$("tp-again").addEventListener("click", () => tpMode("camera"));
+$("tp-gap").addEventListener("input", e => { S.tpGap = +e.target.value; save(); tpDraw(); });
+/* Startpunkt per Tippen; neu gerechnet wird nach kurzer Pause, damit Ziehen flüssig bleibt */
+let tpTimer = null;
+$("tp-canvas").addEventListener("pointerdown", e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  tpStart = { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
+  const pin = $("tp-pin"); pin.style.left = tpStart.x * 100 + "%"; pin.style.top = tpStart.y * 100 + "%";
+  clearTimeout(tpTimer); $("tp-busy").hidden = false;
+  tpTimer = setTimeout(() => { tpCompute(); $("tp-busy").hidden = true; }, 40);
+});
+function tpPage() { return composePage({ bits: tpBits(), w: TP_W, h: TP_H }, tpShotTime || new Date(), "", TEAR_LINES(), false, ""); }
+$("tp-print").addEventListener("click", () => { if (tpField) runPrint(tpPage()); });
+$("tp-save").addEventListener("click", async () => {
+  if (!tpField) return;
+  const k = 3, bits = tpBits(), c = document.createElement("canvas"); c.width = TP_W * k; c.height = TP_H * k;
+  const tmp = document.createElement("canvas"); tmp.width = TP_W; tmp.height = TP_H;
+  const tx = tmp.getContext("2d"), img = tx.createImageData(TP_W, TP_H);
+  for (let i = 0; i < bits.length; i++) { const v = bits[i] ? 20 : 248; img.data[i * 4] = v; img.data[i * 4 + 1] = v; img.data[i * 4 + 2] = bits[i] ? 20 : 242; img.data[i * 4 + 3] = 255; }
+  tx.putImageData(img, 0, 0);
+  const x = c.getContext("2d"); x.imageSmoothingEnabled = false; x.drawImage(tmp, 0, 0, c.width, c.height);
+  const blob = await new Promise(ok => c.toBlob(ok, "image/png"));
+  downloadBlob(blob, stampName(tpShotTime || new Date(), "-topo.png").replace("action-jackson", "topo-popo"));
+  $("tp-save").textContent = "Gespeichert"; setTimeout(() => { $("tp-save").textContent = "Speichern"; }, 1800);
+});
 
 window.Sofortbild = { printer, crc8, cmd, packPage, composePage, dither };
 updateStatus(); keepAwake(); requestAnimationFrame(loop);
