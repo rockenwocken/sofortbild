@@ -301,7 +301,7 @@ body[data-view="topo"]:not([data-tp="edit"]) .tp-edit { display: none !important
       <button class="tp-shutter" id="tp-shutter" type="button" aria-label="Foto aufnehmen"></button>
       <button class="tp-btn" id="tp-light" type="button" aria-pressed="false"><span class="t"></span>Licht</button>
     </div>
-    <div class="tp-slider tp-edit"><label for="tp-gap">Abstand</label><input id="tp-gap" type="range" min="2" max="14" step="0.5"><output id="tp-gap-v"></output></div>
+    <div class="tp-slider tp-edit"><label for="tp-gap">Abstand</label><input id="tp-gap" type="range" min="3" max="8" step="0.5"><output id="tp-gap-v"></output></div>
     <p class="tp-hint tp-edit">Tipp ins Bild, um den Startpunkt der Linien zu setzen.</p>
     <div class="tp-actions tp-edit">
       <button class="tp-act" id="tp-again" type="button">Nochmal</button>
@@ -523,6 +523,8 @@ if (!S.v6) { S.dark = 95; S.curve = 30; S.v6 = 1; save(); }
 if (!S.v7) { S.gain = 5; S.v7 = 1; save(); }
 /* Neues Papier (12 Rollen, 57 × 30 mm) reagiert empfindlicher: mehr Punktzuwachs-Ausgleich */
 if (!S.v8) { S.gain = 25; S.dither = "stucki"; S.pairs = false; S.v8 = 1; save(); }
+/* Gelbfilter für alle Modi */
+if (!S.v9) { S.filter = "yellow"; S.v9 = 1; save(); }
 
 /* ---------- Bildverarbeitung ---------- */
 const HEAD_WIDTH = 384;
@@ -553,6 +555,10 @@ function stepDown(src, sx, sy, sw, sh, w, h) {
   }
   return c;
 }
+/* Farbfilter (Anteile Rot, Grün, Blau). Gelb hellt Haut leicht auf und bringt Augen und Mund heraus. */
+const FILTERS = { none: [.2126, .7152, .0722], yellow: [.5, .45, .05], orange: [.65, .35, 0], red: [.9, .1, 0], green: [.2, .7, .1] };
+const SRGB_LIN = new Float32Array(256).map((_, v) => { const c = v / 255; return c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4); });
+const LIN_SRGB = new Float32Array(4096).map((_, i) => { const c = i / 4095; return 255 * (c <= .0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - .055); });
 function grayCover(src, sw, sh, w, h, mirror, hq = false) {
   scratch.width = w; scratch.height = h;
   const scale = Math.max(w / sw, h / sh), cw = w / scale, ch = h / scale;
@@ -563,7 +569,12 @@ function grayCover(src, sw, sh, w, h, mirror, hq = false) {
   else sctx.drawImage(src, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, w, h);
   sctx.restore();
   const d = sctx.getImageData(0, 0, w, h).data, g = new Float32Array(w * h);
-  for (let i = 0; i < g.length; i++) g[i] = .299 * d[i * 4] + .587 * d[i * 4 + 1] + .114 * d[i * 4 + 2];
+  /* Farbfilter wie in der Schwarzweiß-Fotografie: Kanäle im linearen Licht mischen, dann zurück in Bildhelligkeit */
+  const [fr, fg, fb] = FILTERS[S.filter] || FILTERS.yellow;
+  for (let i = 0; i < g.length; i++) {
+    const y = fr * SRGB_LIN[d[i * 4]] + fg * SRGB_LIN[d[i * 4 + 1]] + fb * SRGB_LIN[d[i * 4 + 2]];
+    g[i] = LIN_SRGB[Math.min(4095, Math.round(y * 4095))];
+  }
   return g;
 }
 /* Kontrast automatisch strecken: Thermopapier kennt nur Schwarz und Weiß */
@@ -1668,12 +1679,13 @@ document.querySelectorAll(".aj-layout").forEach(b => b.addEventListener("click",
 $("aj-print").addEventListener("click", () => { if (ajFrames.length === 4) runPrint(ajStripPage()); });
 
 /* ===================== Topo Popo ===================== */
-/* Höhenlinien nach der Fast-Marching-Methode: Von einem Startpunkt breitet sich eine Welle aus,
-   in hellen Bildteilen schnell, in dunklen langsam. Linien entstehen dort, wo die Welle zur gleichen
-   Zeit ankommt. In dunklen Bereichen liegen sie deshalb dicht, in hellen weit auseinander. */
+/* Gravur auf Höhenlinien: Von einem Startpunkt breitet sich per Fast Marching eine Welle aus,
+   in dunklen Bildteilen etwas langsamer, sodass sich die Linien um das Motiv biegen.
+   Die Linien liegen in gleichmäßigem Abstand; die Helligkeit steckt in der Strichstärke. */
 const TP_W = 384, TP_H = 512;
 let tpGray = null, tpTime = null, tpField = null, tpStart = { x: .5, y: .42 }, tpShotTime = null;
-if (!(S.tpGap >= 2 && S.tpGap <= 14)) S.tpGap = 6;
+/* Linienabstand in Druckpunkten (früher Höhenlinien-Abstand, deshalb neuer Schlüssel) */
+if (!(S.tpPeriod >= 3 && S.tpPeriod <= 8)) S.tpPeriod = 4.5;
 function tpMode(m) { document.body.dataset.tp = m; }
 function tpSync() {
   $("tp-light").setAttribute("aria-pressed", String(lightOn()));
@@ -1717,32 +1729,53 @@ function fastMarch(speed, w, h, sx, sy) {
   return T;
 }
 /* Graustufen → Geschwindigkeit: Weiß = 1, Schwarz = fast 0 (dort stauen sich die Linien zu Schwarz) */
+/* Weichzeichnen (Box-Blur über Summenbild) */
+function boxBlur(g, w, h, rad) {
+  const W1 = w + 1, I = new Float64Array(W1 * (h + 1)), out = new Float32Array(g.length);
+  for (let y = 0; y < h; y++) { let row = 0; for (let x = 0; x < w; x++) { row += g[y * w + x]; I[(y + 1) * W1 + x + 1] = I[y * W1 + x + 1] + row; } }
+  for (let y = 0; y < h; y++) { const y0 = Math.max(0, y - rad), y1 = Math.min(h, y + rad + 1);
+    for (let x = 0; x < w; x++) { const x0 = Math.max(0, x - rad), x1 = Math.min(w, x + rad + 1);
+      out[y * w + x] = (I[y1 * W1 + x1] - I[y0 * W1 + x1] - I[y1 * W1 + x0] + I[y0 * W1 + x0]) / ((y1 - y0) * (x1 - x0)); } }
+  return out;
+}
+/* Die Welle bremst in dunklen Bereichen nur mäßig (Tempo 0,55 bis 1), damit sich die Linien um das Motiv biegen,
+   aber nicht so stark zusammenrücken, dass sie zacken oder ein Moiré bilden */
 function tpSpeed(g, w, h) {
-  const b = new Float32Array(g.length);
-  /* leicht weichzeichnen, damit die Linien nicht ausfransen */
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    let sum = 0, c = 0;
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-      const xx = x + dx, yy = y + dy;
-      if (xx >= 0 && xx < w && yy >= 0 && yy < h) { sum += g[yy * w + xx]; c++; }
-    }
-    b[y * w + x] = sum / c;
-  }
-  for (let i = 0; i < b.length; i++) b[i] = .14 + .86 * Math.min(1, Math.max(0, b[i] / 255));
+  const b = boxBlur(g, w, h, 4);
+  for (let i = 0; i < b.length; i++) b[i] = .55 + .45 * Math.min(1, Math.max(0, b[i] / 255));
   return b;
 }
 function tpCompute() {
   if (!tpGray) return;
   const sx = Math.round(tpStart.x * (TP_W - 1)), sy = Math.round(tpStart.y * (TP_H - 1));
-  tpField = fastMarch(tpSpeed(tpGray, TP_W, TP_H), TP_W, TP_H, sx, sy);
+  const T = fastMarch(tpSpeed(tpGray, TP_W, TP_H), TP_W, TP_H, sx, sy);
+  /* Zeit so normieren, dass der mittlere Linienabstand dem eingestellten Wert in Druckpunkten entspricht */
+  const grads = [];
+  for (let i = 0; i < T.length; i += 37) { const x = i % TP_W, y = (i / TP_W) | 0; if (x < TP_W - 1 && y < TP_H - 1) grads.push(Math.hypot(T[i + 1] - T[i], T[i + TP_W] - T[i])); }
+  grads.sort((a, b) => a - b);
+  const m = grads[grads.length >> 1] || 1;
+  for (let i = 0; i < T.length; i++) T[i] /= m;
+  tpField = T;
   tpDraw();
 }
-/* Linie dort, wo zwischen zwei Nachbarpunkten eine Höhenstufe überschritten wird */
+/* Linienraster auf den Kurven: die Strichstärke folgt der Dunkelheit.
+   Vierfach überabgetastet, damit die Strichstärke feiner abgestuft ist als ein Druckpunkt. */
 function tpBits() {
-  const T = tpField, w = TP_W, h = TP_H, gap = S.tpGap, bits = new Uint8Array(w * h);
+  const T = tpField, w = TP_W, h = TP_H, P = S.tpPeriod, K = 4, bits = new Uint8Array(w * h);
+  const ink = new Float32Array(tpGray.length), lut = dotGainLut(.1);
+  for (let i = 0; i < ink.length; i++) { const v = Math.min(255, Math.max(0, tpGray[i])); ink[i] = 1 - lut[v | 0] / 255; }
+  const at = (A, x, y) => {   /* bilinear */
+    const x0 = Math.min(w - 2, Math.max(0, Math.floor(x))), y0 = Math.min(h - 2, Math.max(0, Math.floor(y))), fx = Math.min(1, Math.max(0, x - x0)), fy = Math.min(1, Math.max(0, y - y0)), i = y0 * w + x0;
+    return (A[i] * (1 - fx) + A[i + 1] * fx) * (1 - fy) + (A[i + w] * (1 - fx) + A[i + w + 1] * fx) * fy;
+  };
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = y * w + x, l = Math.floor(T[i] / gap);
-    if ((x < w - 1 && Math.floor(T[i + 1] / gap) !== l) || (y < h - 1 && Math.floor(T[i + w] / gap) !== l)) bits[i] = 1;
+    let black = 0;
+    for (let sy = 0; sy < K; sy++) for (let sx = 0; sx < K; sx++) {
+      const px = x + (sx + .5) / K - .5, py = y + (sy + .5) / K - .5;
+      const u = (at(T, px, py) / P) % 1;
+      if (Math.abs(u - .5) < at(ink, px, py) / 2) black++;
+    }
+    bits[y * w + x] = black * 2 >= K * K ? 1 : 0;
   }
   return bits;
 }
@@ -1750,7 +1783,7 @@ function tpDraw() {
   if (!tpField) return;
   const c = $("tp-canvas"); paintBits(c.getContext("2d"), tpBits(), TP_W, TP_H);
   const pin = $("tp-pin"); pin.style.left = tpStart.x * 100 + "%"; pin.style.top = tpStart.y * 100 + "%";
-  $("tp-gap").value = S.tpGap; $("tp-gap-v").textContent = String(S.tpGap).replace(".", ",");
+  $("tp-gap").value = S.tpPeriod; $("tp-gap-v").textContent = String(S.tpPeriod).replace(".", ",");
 }
 async function tpShoot() {
   $("tp-shutter").disabled = true;
@@ -1776,7 +1809,7 @@ $("tp-flip").addEventListener("click", async () => { facing = facing === "user" 
 $("tp-light").addEventListener("click", async () => { await toggleTorch(); tpSync(); });
 $("tp-home").addEventListener("click", () => history.length > 1 ? history.back() : (location.hash = ""));
 $("tp-again").addEventListener("click", () => tpMode("camera"));
-$("tp-gap").addEventListener("input", e => { S.tpGap = +e.target.value; save(); tpDraw(); });
+$("tp-gap").addEventListener("input", e => { S.tpPeriod = +e.target.value; save(); tpDraw(); });
 /* Startpunkt per Tippen; neu gerechnet wird nach kurzer Pause, damit Ziehen flüssig bleibt */
 let tpTimer = null;
 $("tp-canvas").addEventListener("pointerdown", e => {
