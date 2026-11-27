@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Malspiel</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #fff; color: #111;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { -webkit-user-select: none; user-select: none; overflow-x: hidden; }
+  .screen { display: none; min-height: 100dvh; padding: 24px 20px;
+    flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .screen.active { display: flex; }
+  h1 { font-size: 2.6rem; font-weight: 900; margin-bottom: 8px; }
+  .sub { color: #666; margin-bottom: 40px; }
+  .slider-box { width: 100%; max-width: 360px; margin-bottom: 40px; }
+  .slider-label { font-size: 1.1rem; margin-bottom: 14px; }
+  .slider-label b { font-size: 1.6rem; }
+  input[type=range] { width: 100%; height: 36px; accent-color: #111; }
+  .scale { display: flex; justify-content: space-between; color: #999; font-size: .85rem; }
+  button { font: inherit; font-weight: 800; font-size: 1.3rem; padding: 18px 44px;
+    border: 3px solid #111; border-radius: 999px; background: #111; color: #fff; cursor: pointer; }
+  button.ghost { background: #fff; color: #111; margin-top: 12px; font-size: 1rem; padding: 12px 28px; }
+  button:active { transform: scale(.97); }
+
+  #play { position: relative; padding: 16px; }
+  #word { font-weight: 900; line-height: 1.05; word-break: break-word; hyphens: auto;
+    font-size: clamp(3rem, 16vw, 9rem); }
+  #counter { position: absolute; top: max(16px, env(safe-area-inset-top)); left: 0; right: 0;
+    color: #bbb; font-weight: 700; font-size: 1rem; }
+  #bar { position: absolute; bottom: 0; left: 0; height: 6px; background: #111; width: 0; }
+  #stop { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 50%;
+    transform: translateX(-50%); background: none; border: none; color: #ccc;
+    font-size: .95rem; font-weight: 600; padding: 8px 16px; }
+
+  #list { list-style: none; counter-reset: n; width: 100%; max-width: 420px;
+    margin: 8px 0 32px; text-align: left; columns: 2; column-gap: 24px; }
+  #list li { counter-increment: n; font-size: 1.25rem; font-weight: 700; padding: 6px 0;
+    border-bottom: 1px solid #eee; break-inside: avoid; }
+  #list li::before { content: counter(n) ". "; color: #bbb; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<section id="start" class="screen active">
+  <h1>Malspiel</h1>
+  <p class="sub">16 Begriffe · malen, bevor der Ton kommt</p>
+  <div class="slider-box">
+    <div class="slider-label">Zeit pro Begriff: <b id="secLabel">5</b> Sek.</div>
+    <input id="interval" type="range" min="2" max="10" step="1" value="5">
+    <div class="scale"><span>2</span><span>10</span></div>
+  </div>
+  <button id="startBtn">Start</button>
+</section>
+
+<section id="play" class="screen">
+  <div id="counter"></div>
+  <div id="word"></div>
+  <div id="bar"></div>
+  <button id="stop">Abbrechen</button>
+</section>
+
+<section id="end" class="screen">
+  <h1>Fertig!</h1>
+  <p class="sub">Diese Begriffe waren dran:</p>
+  <ol id="list"></ol>
+  <button id="nextBtn">Nächster Spieler</button>
+  <button id="homeBtn" class="ghost">Einstellungen</button>
+</section>
+
+<script>
+const WORDS = [
+  "Sonne","Mond","Stern","Wolke","Regenbogen","Blitz","Schneemann","Schneeflocke",
+  "Haus","Burg","Zelt","Leuchtturm","Brücke","Kirche",
+  "Katze","Hund","Maus","Fisch","Vogel","Schnecke","Schmetterling","Biene","Spinne",
+  "Schlange","Elefant","Giraffe","Hase","Igel","Ente","Schwein","Kuh","Pferd","Krokodil",
+  "Wal","Eule","Pinguin","Frosch","Krake","Schildkröte","Löwe","Affe","Dinosaurier",
+  "Baum","Blume","Pilz","Kaktus","Apfel","Banane","Birne","Erdbeere","Karotte","Kirsche",
+  "Eis am Stiel","Torte","Pizza","Brezel","Ei","Tasse","Flasche","Gabel","Löffel",
+  "Regenschirm","Brille","Schlüssel","Krone","Glühbirne","Uhr","Hut","Schuh","Socke",
+  "Hose","T-Shirt","Handschuh","Kerze","Lampe","Stuhl","Tisch","Bett","Fenster","Tür",
+  "Fahrrad","Auto","Bus","Zug","Schiff","Flugzeug","Rakete","Hubschrauber","Traktor",
+  "Ball","Drachen","Ballon","Geschenk","Teddybär","Roboter","Gitarre","Trommel",
+  "Telefon","Fernseher","Computer","Kamera","Schere","Stift","Buch","Brief",
+  "Herz","Anker","Schwert","Leiter","Eimer","Schaufel","Hammer","Säge","Besen",
+  "Zahnbürste","Kamm","Spiegel","Koffer","Rucksack","Zaun","Ampel","Schneckenhaus",
+  "Gespenst","Hexe","Pirat","Kürbis","Tannenbaum","Muschel","Seestern","Vulkan","Insel"
+];
+const ROUND = 16;
+const $ = id => document.getElementById(id);
+const slider = $("interval");
+
+try { const s = localStorage.getItem("malspiel-sec"); if (s) slider.value = s; } catch (e) {}
+$("secLabel").textContent = slider.value;
+slider.addEventListener("input", () => {
+  $("secLabel").textContent = slider.value;
+  try { localStorage.setItem("malspiel-sec", slider.value); } catch (e) {}
+});
+
+let audio, timer, raf, words = [], idx = 0, wakeLock = null;
+
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
+}
+
+function pickWords() {
+  const pool = WORDS.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, ROUND);
+}
+
+function beep(freq = 880, dur = 0.18, when = 0) {
+  if (!audio) return;
+  const t = audio.currentTime + when;
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = "sine"; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.5, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(audio.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+
+async function keepAwake() {
+  try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+}
+function releaseAwake() { try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null; }
+
+function showWord() {
+  const ms = Number(slider.value) * 1000;
+  $("word").textContent = words[idx];
+  $("counter").textContent = (idx + 1) + " / " + ROUND;
+  beep(idx === 0 ? 660 : 880);
+  const t0 = performance.now();
+  cancelAnimationFrame(raf);
+  const tick = now => {
+    $("bar").style.width = Math.min(100, (now - t0) / ms * 100) + "%";
+    if (now - t0 < ms) raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+  timer = setTimeout(() => {
+    idx++;
+    if (idx < ROUND) showWord(); else finish();
+  }, ms);
+}
+
+function startRound() {
+  if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+  if (audio.state === "suspended") audio.resume();
+  words = pickWords(); idx = 0;
+  keepAwake();
+  show("play");
+  showWord();
+}
+
+function stopRound() {
+  clearTimeout(timer); cancelAnimationFrame(raf); releaseAwake();
+}
+
+function finish() {
+  stopRound();
+  beep(660, 0.15); beep(880, 0.15, 0.17); beep(1100, 0.3, 0.34);
+  $("list").innerHTML = "";
+  words.forEach(w => { const li = document.createElement("li"); li.textContent = w; $("list").appendChild(li); });
+  show("end");
+}
+
+$("startBtn").onclick = startRound;
+$("nextBtn").onclick = startRound;
+$("homeBtn").onclick = () => show("start");
+$("stop").onclick = () => { stopRound(); show("start"); };
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && $("play").classList.contains("active")) keepAwake();
+});
+</script>
+</body>
+</html>
