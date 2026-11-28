@@ -16,7 +16,9 @@
   h1 { font-size: 2.6rem; font-weight: 900; margin-bottom: 8px; }
   .sub { color: #666; margin-bottom: 40px; }
   .title { font-size: clamp(2.2rem, 11vw, 4rem); letter-spacing: -0.02em; margin-bottom: 48px; word-break: break-all; }
-  #settings { width: 100%; max-width: 360px; margin-top: 40px; }
+  #start { justify-content: flex-start; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
+  #settings { width: 100%; max-width: 360px; margin-top: 24px; }
   #settings summary { list-style: none; cursor: pointer; color: #666; font-weight: 700; font-size: 1.05rem; padding: 10px; }
   #settings summary::-webkit-details-marker { display: none; }
   #settings summary::before { content: "⚙︎ "; }
@@ -58,8 +60,10 @@
 <body>
 
 <section id="start" class="screen active">
-  <h1 class="title">PAAAAIIIIINNN-t</h1>
-  <button id="startBtn">Start</button>
+  <div class="hero">
+    <h1 class="title">PAAAAIIIIINNN-t</h1>
+    <button id="startBtn">Start</button>
+  </div>
   <details id="settings">
     <summary>Einstellungen</summary>
     <div class="slider-box">
@@ -86,7 +90,6 @@
   <p class="sub">Diese Begriffe waren dran:</p>
   <ol id="list"></ol>
   <button id="nextBtn">Nächster Spieler</button>
-  <button id="homeBtn" class="ghost">Einstellungen</button>
 </section>
 
 <script>
@@ -1224,7 +1227,6 @@ function finish() {
 
 $("startBtn").onclick = startRound;
 $("nextBtn").onclick = startRound;
-$("homeBtn").onclick = () => { show("start"); $("settings").open = true; };
 $("stop").onclick = () => { stopRound(); show("start"); };
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && $("play").classList.contains("active")) keepAwake();
