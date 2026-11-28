@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
-<title>Malspiel</title>
+<title>PAAAAIIIIINNN-t</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; background: #fff; color: #111;
@@ -15,12 +15,18 @@
   .screen.active { display: flex; }
   h1 { font-size: 2.6rem; font-weight: 900; margin-bottom: 8px; }
   .sub { color: #666; margin-bottom: 40px; }
-  .slider-box { width: 100%; max-width: 360px; margin-bottom: 40px; }
+  .title { font-size: clamp(2.2rem, 11vw, 4rem); letter-spacing: -0.02em; margin-bottom: 48px; word-break: break-all; }
+  #settings { width: 100%; max-width: 360px; margin-top: 40px; }
+  #settings summary { list-style: none; cursor: pointer; color: #666; font-weight: 700; font-size: 1.05rem; padding: 10px; }
+  #settings summary::-webkit-details-marker { display: none; }
+  #settings summary::before { content: "⚙︎ "; }
+  #settings[open] summary { color: #111; margin-bottom: 20px; }
+  .slider-box { width: 100%; max-width: 360px; margin-bottom: 32px; }
   .slider-label { font-size: 1.1rem; margin-bottom: 14px; }
   .slider-label b { font-size: 1.6rem; }
   input[type=range] { width: 100%; height: 36px; accent-color: #111; }
   .scale { display: flex; justify-content: space-between; color: #999; font-size: .85rem; }
-  .toggles { display: flex; flex-direction: column; gap: 14px; margin-bottom: 36px; text-align: left; }
+  .toggles { display: flex; flex-direction: column; gap: 14px; margin: 0 auto 12px; text-align: left; width: max-content; }
   .toggles label { font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 12px; }
   .toggles input { width: 24px; height: 24px; accent-color: #111; }
   .toggles small { color: #999; font-weight: 400; }
@@ -42,26 +48,30 @@
 
   #list { list-style: none; counter-reset: n; width: 100%; max-width: 420px;
     margin: 8px 0 32px; text-align: left; columns: 2; column-gap: 24px; }
-  #list li { counter-increment: n; font-size: 1.25rem; font-weight: 700; padding: 6px 0;
+  #list li { counter-increment: n; font-size: 1.1rem; font-weight: 700; padding: 6px 0;
     border-bottom: 1px solid #eee; break-inside: avoid; }
+  #list li { cursor: pointer; transition: color .15s; }
+  #list li.done { color: #ccc; text-decoration: line-through; }
   #list li::before { content: counter(n) ". "; color: #bbb; font-weight: 600; }
 </style>
 </head>
 <body>
 
 <section id="start" class="screen active">
-  <h1>Malspiel</h1>
-  <p class="sub">16 Begriffe · malen, bevor der Ton kommt</p>
-  <div class="slider-box">
-    <div class="slider-label">Zeit pro Begriff: <b id="secLabel">5</b> Sek.</div>
-    <input id="interval" type="range" min="2" max="10" step="1" value="5">
-    <div class="scale"><span>2</span><span>10</span></div>
-  </div>
-  <div class="toggles">
-    <label><input type="checkbox" id="optOwn" checked> Eigene Begriffe <small>(31)</small></label>
-    <label><input type="checkbox" id="optAdult"> Ab 18 <small>(30)</small></label>
-  </div>
+  <h1 class="title">PAAAAIIIIINNN-t</h1>
   <button id="startBtn">Start</button>
+  <details id="settings">
+    <summary>Einstellungen</summary>
+    <div class="slider-box">
+      <div class="slider-label">Zeit pro Begriff: <b id="secLabel">5</b> Sek.</div>
+      <input id="interval" type="range" min="2" max="10" step="1" value="5">
+      <div class="scale"><span>2</span><span>10</span></div>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="optOwn" checked> Eigene Begriffe <small>(31)</small></label>
+      <label><input type="checkbox" id="optAdult" checked> Ab 18 <small>(30)</small></label>
+    </div>
+  </details>
 </section>
 
 <section id="play" class="screen">
@@ -1171,8 +1181,8 @@ function show(id) {
 }
 
 ["optOwn","optAdult"].forEach(id => {
-  try { const v = localStorage.getItem("malspiel-" + id); if (v !== null) $(id).checked = v === "1"; } catch (e) {}
-  $(id).addEventListener("change", () => { try { localStorage.setItem("malspiel-" + id, $(id).checked ? "1" : "0"); } catch (e) {} });
+  try { const v = localStorage.getItem("paint-" + id); if (v !== null) $(id).checked = v === "1"; } catch (e) {}
+  $(id).addEventListener("change", () => { try { localStorage.setItem("paint-" + id, $(id).checked ? "1" : "0"); } catch (e) {} });
 });
 
 function pickWords() {
@@ -1260,13 +1270,13 @@ function finish() {
   stopRound();
   beep(660, 0.15); beep(880, 0.15, 0.17); beep(1100, 0.3, 0.34);
   $("list").innerHTML = "";
-  words.forEach(w => { const li = document.createElement("li"); li.textContent = w; $("list").appendChild(li); });
+  words.forEach(w => { const li = document.createElement("li"); li.textContent = w; li.onclick = () => li.classList.toggle("done"); $("list").appendChild(li); });
   show("end");
 }
 
 $("startBtn").onclick = startRound;
 $("nextBtn").onclick = startRound;
-$("homeBtn").onclick = () => show("start");
+$("homeBtn").onclick = () => { show("start"); $("settings").open = true; };
 $("stop").onclick = () => { stopRound(); show("start"); };
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && $("play").classList.contains("active")) keepAwake();
